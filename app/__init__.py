@@ -19,20 +19,20 @@ def create_app(config_name):
     migrate.init_app(app, db)
     
     # Register error handlers
-    from app.global.exception.exception_handler import register_error_handlers
+    from app.common.exception.exception_handler import register_error_handlers
     register_error_handlers(app)
     
     # Register CLI commands
     from app.commands import register_commands
     register_commands(app)
     
-    # Register blueprints here when created
-    # from app.user.routes import user_bp
-    # app.register_blueprint(user_bp)
+    # Register blueprints
+    from app.user.routes import user_bp
+    app.register_blueprint(user_bp)
     
     @app.route('/health')
     def health_check():
         """Simple health check endpoint"""
         return {'status': 'ok', 'service': 'backend-eye'}, 200
     
-    return app 
+    return app

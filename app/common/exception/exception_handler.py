@@ -1,7 +1,7 @@
 """Exception handler for Flask application"""
 from flask import jsonify
 from sqlalchemy.exc import SQLAlchemyError
-from app.global.exception.business_exception import BusinessException, DatabaseException
+from app.common.exception.business_exception import BusinessException, DatabaseException
 
 def register_error_handlers(app):
     """Register error handlers with Flask app"""

@@ -1,4 +1,10 @@
 import os
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+sys.path.insert(0, str(Path(__file__).parent))
+
 from app import create_app
 
 # Get configuration from environment variable, default to 'development'

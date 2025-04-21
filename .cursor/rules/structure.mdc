@@ -19,7 +19,7 @@ backend_eye/
 ├── app/ # 애플리케이션 패키지
 │ ├── init.py # Flask 앱 초기화
 │ ├── config.py # 애플리케이션 설정
-│ ├── global/ # 전역 설정, 공통 예외/응답 등
+│ ├── common/ # 전역 설정, 공통 예외/응답 등
 │ ├── auth/ # 인증/인가 (JWT, OAuth2 등)
 │ ├── user/ # 사용자 도메인
 │ ├── cat_eye/ # 고양이 눈 진단 도메인
@@ -31,8 +31,8 @@ backend_eye/
 
 ---
 
-## 2. global/ - 전역 설정 및 공통 유틸
-global/
+## 2. common/ - 전역 설정 및 공통 유틸
+common/
 ├── init.py
 ├── config/ # 전역 설정
 │ └── init.py
@@ -165,10 +165,10 @@ models/
 
 ## 9. 공통 파일 규칙
 
-- 모든 공통 예외는 `global/exception`에 위치하고 `BusinessException`을 상속
+- 모든 공통 예외는 `common/exception`에 위치하고 `BusinessException`을 상속
 - 도메인별 비즈니스 예외는 각 도메인의 `exception/` 폴더에 위치
 - `ErrorCode`는 HTTP 상태 코드, 코드 문자열, 메시지를 포함함
-- 응답은 `ApiResponse` 형식으로 통일 (`global/response`)
+- 응답은 `ApiResponse` 형식으로 통일 (`common/response`)
 - 인증 사용자 정보는 `UserPrincipal`로 통합
 - 설정은 `app/config.py` 및 `.env` 파일로 관리
 - Python 모듈은 항상 `__init__.py` 포함
