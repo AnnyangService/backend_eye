@@ -1,0 +1,25 @@
+alembic @ file:///home/conda/feedstock_root/build_artifacts/alembic_1743207807124/work
+blinker @ file:///home/conda/feedstock_root/build_artifacts/blinker_1731096409132/work
+click @ file:///D:/bld/click_1734858834134/work
+colorama @ file:///home/conda/feedstock_root/build_artifacts/colorama_1733218098505/work
+Flask @ file:///home/conda/feedstock_root/build_artifacts/flask_1741793020411/work
+Flask-Migrate @ file:///home/conda/feedstock_root/build_artifacts/flask-migrate_1736546704161/work
+Flask-SQLAlchemy @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_flask-sqlalchemy_1733868589/work
+greenlet @ file:///D:/bld/greenlet_1744755713581/work
+importlib_metadata @ file:///home/conda/feedstock_root/build_artifacts/importlib-metadata_1737420181517/work
+itsdangerous @ file:///home/conda/feedstock_root/build_artifacts/itsdangerous_1733308265247/work
+Jinja2 @ file:///home/conda/feedstock_root/build_artifacts/jinja2_1741263328855/work
+Mako @ file:///home/conda/feedstock_root/build_artifacts/mako_1744317760971/work
+MarkupSafe @ file:///D:/bld/markupsafe_1733219601796/work
+marshmallow @ file:///home/conda/feedstock_root/build_artifacts/marshmallow_1744899965922/work
+psycopg2 @ file:///D:/bld/psycopg2-split_1727892603976/work
+psycopg2-binary @ file:///home/conda/feedstock_root/build_artifacts/psycopg2-split_1701737547976/work/psycopg2-binary
+PyJWT @ file:///home/conda/feedstock_root/build_artifacts/pyjwt_1732782409051/work
+PyMySQL @ file:///home/conda/feedstock_root/build_artifacts/pymysql_1734209850979/work
+python-dotenv @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_python-dotenv_1742948348/work
+setuptools==75.8.0
+SQLAlchemy @ file:///D:/bld/sqlalchemy_1743109492829/work
+typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/bld/rattler-build_typing_extensions_1744302253/work
+Werkzeug @ file:///home/conda/feedstock_root/build_artifacts/werkzeug_1733160440960/work
+wheel==0.45.1
+zipp @ file:///home/conda/feedstock_root/build_artifacts/zipp_1732827521216/work

@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: true
+alwaysApply: false
 ---
 ---
 description: 
@@ -81,8 +81,7 @@ AI/ML Integration
 - Implement proper input validation and preprocessing.
 
 Build and Deployment
-- Use Conda for environment and dependency management.
-- Define environments with environment.yml files.
+- Use pip and requirements.txt or Poetry for dependency management.
 - Implement proper configuration for different environments (dev, test, prod).
 - Use Docker for containerization and ensure reproducibility.
 - Implement CI/CD pipelines for automated testing and deployment.
