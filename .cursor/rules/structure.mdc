@@ -1,0 +1,222 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+---
+description: Use this structure guide every time you add new files or directories
+globs: 
+alwaysApply: false
+---
+# 프로젝트 폴더 구조 가이드 (도메인 기반 + 전역/공통 모듈 분리)
+> 📌 Cursor에서 파일 생성 시 이 구조를 참고하세요.
+
+---
+
+## 1. 전체 구조 요약
+```
+backend_eye/
+├── app/ # 애플리케이션 패키지
+│ ├── init.py # Flask 앱 초기화
+│ ├── config.py # 애플리케이션 설정
+│ ├── global/ # 전역 설정, 공통 예외/응답 등
+│ ├── auth/ # 인증/인가 (JWT, OAuth2 등)
+│ ├── user/ # 사용자 도메인
+│ ├── cat_eye/ # 고양이 눈 진단 도메인
+│ └── models/ # AI 모델 관련 파일
+├── requirements.txt # 의존성 패키지
+├── .env # 환경 변수 (gitignored)
+└── run.py # 애플리케이션 진입점
+```
+
+---
+
+## 2. global/ - 전역 설정 및 공통 유틸
+global/
+├── init.py
+├── config/ # 전역 설정
+│ └── init.py
+├── exception/ # 공통 예외 처리 및 예외 상위 클래스
+│ ├── init.py
+│ ├── business_exception.py
+│ └── exception_handler.py
+├── response/ # 공통 응답 포맷 및 에러 코드
+│ ├── init.py
+│ ├── api_response.py
+│ ├── error_response.py
+│ └── error_code.py
+└── util/ # 공통 유틸 클래스
+└── init.py
+
+---
+
+## 3. auth/ - JWT 토큰 검증 및 파싱 (외부 인증 서버 연동)
+```
+auth/
+├── init.py
+├── middleware/ # 토큰 검증 미들웨어
+│ ├── init.py
+│ └── jwt_middleware.py # JWT 토큰 검증 및 사용자 정보 추출
+├── exception/ # 인증 관련 예외
+│ ├── init.py
+│ └── invalid_token_exception.py
+├── service/
+│ ├── init.py
+│ └── jwt_parser_service.py # JWT 토큰 파싱 서비스
+└── model/
+├── init.py
+└── user_principal.py # 파싱된 사용자 정보 모델
+```
+
+---
+
+## 4. user/ - 회원 도메인
+```
+user/
+├── init.py
+├── routes.py # 사용자 라우트
+├── schemas/ # 데이터 검증 스키마
+│ └── init.py
+├── model/ # 데이터 모델 (SQLAlchemy)
+│ └── init.py
+├── exception/ # 사용자 도메인 관련 비즈니스 예외
+│ ├── init.py
+│ ├── duplicated_email_exception.py
+│ └── user_not_found_exception.py
+├── repository/ # 데이터 액세스 레이어
+│ └── init.py
+└── service/ # 비즈니스 로직
+└── init.py
+```
+
+---
+
+## 5. app/cat_eye/ - 고양이 눈 진단 도메인
+```
+cat_eye/
+├── init.py
+├── routes.py # 진단 API 엔드포인트
+├── schemas/ # 데이터 검증 스키마
+│ ├── init.py
+│ ├── request_schema.py # 이미지 업로드 요청 스키마
+│ └── response_schema.py # 진단 결과 응답 스키마
+├── model/ # 데이터 모델
+│ ├── init.py
+│ └── diagnosis_result.py # 진단 결과 모델
+├── exception/ # 도메인 예외
+│ ├── init.py
+│ ├── image_quality_exception.py
+│ └── diagnosis_exception.py
+├── repository/ # 데이터 액세스
+│ ├── init.py
+│ └── diagnosis_repository.py # 진단 결과 저장/조회
+└── service/ # 비즈니스 로직
+├── init.py
+├── image_service.py # 이미지 처리 서비스
+├── quality_service.py # 품질 검사 서비스
+└── diagnosis_service.py # 질병 진단 서비스
+```
+
+---
+
+## 6. app/models/ - AI 모델 관리
+```
+models/
+├── init.py
+├── loader/ # 모델 로드 유틸리티
+│ ├── init.py
+│ └── model_loader.py
+├── cat_eye/ # 고양이 눈 관련 AI 모델
+├── preprocessing/ # 데이터 전처리
+│ ├── init.py
+│ └── image_preprocessor.py
+├── postprocessing/ # 결과 후처리
+│ ├── init.py
+│ └── result_formatter.py
+└── cache/ # 모델 캐싱
+└── init.py
+```
+---
+
+## 7. 도메인 추가 시 확장 규칙
+> **원칙**
+> - routes, service, model, repository, schemas, exception 계층 구조 유지
+> - routes는 RESTful API 설계 원칙 준수 (@app.route 데코레이터 활용)
+> - service는 비즈니스 로직만 담당
+> - repository는 SQLAlchemy를 활용한 데이터 액세스 담당
+> - exception은 `BusinessException`을 상속하고 도메인별로 정의
+> - schemas는 `Request`, `Response` 검증 담당 (Marshmallow 또는 Pydantic)
+
+---
+
+## 8. 파일 네이밍 규칙
+
+| 계층         | 접미사 예시              |
+|--------------|--------------------------|
+| Routes       | `routes.py`              |
+| Service      | `*_service.py`           |
+| Schemas      | `*_schema.py`            |
+| Model        | 실제 도메인명            |
+| Repository   | `*_repository.py`        |
+| Exception    | `*_exception.py`         |
+| Middleware   | `*_middleware.py`        |
+
+---
+
+## 9. 공통 파일 규칙
+
+- 모든 공통 예외는 `global/exception`에 위치하고 `BusinessException`을 상속
+- 도메인별 비즈니스 예외는 각 도메인의 `exception/` 폴더에 위치
+- `ErrorCode`는 HTTP 상태 코드, 코드 문자열, 메시지를 포함함
+- 응답은 `ApiResponse` 형식으로 통일 (`global/response`)
+- 인증 사용자 정보는 `UserPrincipal`로 통합
+- 설정은 `app/config.py` 및 `.env` 파일로 관리
+- Python 모듈은 항상 `__init__.py` 포함
+
+---
+
+## 10. 테스트 디렉토리 구조
+`tests/` 기준
+
+- 도메인 기준으로 테스트 디렉토리 구성
+```
+tests/
+├── conftest.py # pytest 공통 fixture
+├── cat_eye/
+│ ├── test_routes.py
+│ ├── test_services.py
+│ └── test_models.py
+├── models/
+│ ├── test_quality_model.py
+│ └── test_disease_model.py
+```
+> pytest 사용, test_ 접두사 사용
+
+---
+
+## 11. 기타 확장 가이드
+
+- 관리자 전용 API는 `admin/` 도메인으로 분리
+- 비동기 작업은 `tasks/` 디렉토리로 구성 (Celery 사용)
+- 외부 연동 API는 `integrations/` 디렉토리 사용
+```
+integrations/
+├── init.py
+├── cloud/
+│ ├── init.py
+│ └── s3_client.py # 이미지 저장소
+├── notification/
+│ ├── init.py
+│ └── email_service.py
+└── payment/
+└── init.py
+```
+
+- 데이터 저장/캐시는 `storage/` 디렉토리 사용
+```
+storage/
+├── init.py
+├── file_storage.py # 이미지 파일 저장
+└── cache_service.py # 결과 캐싱
+```
+

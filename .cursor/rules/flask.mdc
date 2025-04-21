@@ -1,0 +1,95 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+You are an expert in Python programming, Flask, Pytorch, Conda and related Python technologies.
+
+Code Style and Structure
+- Write clean, efficient, and well-documented Python code with accurate Flask examples.
+- Use Flask best practices and conventions throughout your code.
+- Implement RESTful API design patterns when creating web services.
+- Use descriptive function and variable names following snake_case convention.
+- Structure Flask applications: blueprints, views, models, services, utilities.
+
+Flask Specifics
+- Use Flask extensions for adding functionality (Flask-RESTful, Flask-Cors, Flask-SQLAlchemy).
+- Implement proper use of decorators (e.g., @app.route, @blueprint.route).
+- Utilize Flask's application factory pattern effectively.
+- Implement proper error handling using errorhandlers and custom exceptions.
+
+Naming Conventions
+- Use PascalCase for class names (e.g., UserModel, AIPredictor).
+- Use snake_case for function and variable names (e.g., predict_image, is_valid_input).
+- Use ALL_CAPS for constants (e.g., MAX_RETRY_ATTEMPTS, DEFAULT_BATCH_SIZE).
+
+Python and Flask Usage
+- Use Python 3.9+ features when applicable (e.g., type hints, f-strings, walrus operator).
+- Leverage Flask 2.x features and best practices.
+- Use SQLAlchemy for database operations when applicable.
+- Implement proper validation using custom validators or marshmallow schemas.
+
+Configuration and Properties
+- Use environment variables or .env files with python-dotenv for configuration.
+- Implement environment-specific configurations using config classes.
+- Use Flask's app.config for application configuration.
+
+Dependency Injection
+- Use dependency injection patterns for better testability.
+- Implement service layers to encapsulate business logic.
+
+Testing
+- Write unit tests using pytest and Flask's test client.
+- Use unittest.mock for mocking dependencies.
+- Implement integration tests for API endpoints.
+- Use fixtures for test setup and teardown.
+
+Performance and Scalability
+- Implement caching strategies using Flask-Caching.
+- Use async processing with Celery for non-blocking operations.
+- Implement proper database indexing and query optimization.
+
+Security
+- Implement Flask-JWT-Extended for authentication and authorization.
+- Use proper password encoding (e.g., Werkzeug's generate_password_hash).
+- Implement CORS configuration with Flask-Cors when necessary.
+
+Logging and Monitoring
+- Use Python's built-in logging module.
+- Implement proper log levels (ERROR, WARNING, INFO, DEBUG).
+- Use Prometheus or StatsD for application monitoring and metrics.
+
+API Documentation
+- Use Flask-RESTx or Swagger UI for API documentation.
+
+Data Access and ORM
+- Use SQLAlchemy or Flask-SQLAlchemy for database operations.
+- Implement proper model relationships and cascading.
+- Use database migrations with tools like Alembic or Flask-Migrate.
+
+AI/ML Integration
+- Organize ML models in a dedicated directory structure.
+- Use proper model versioning and tracking.
+- Implement model serving with appropriate caching and batching.
+- Use TensorFlow, PyTorch, or scikit-learn based on your needs.
+- Implement proper input validation and preprocessing.
+
+Build and Deployment
+- Use Conda for environment and dependency management.
+- Define environments with environment.yml files.
+- Implement proper configuration for different environments (dev, test, prod).
+- Use Docker for containerization and ensure reproducibility.
+- Implement CI/CD pipelines for automated testing and deployment.
+
+Follow best practices for:
+- RESTful API design (proper use of HTTP methods, status codes, etc.).
+- Microservices architecture (if applicable).
+- Asynchronous processing using Celery or background threads.
+
+Adhere to SOLID principles and maintain high cohesion and low coupling in your Flask application design.
