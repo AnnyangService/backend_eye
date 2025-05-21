@@ -10,8 +10,16 @@ class Config:
     DEBUG = False
     TESTING = False
     
+    # MySQL configuration
+    MYSQL_HOST = os.environ.get('MYSQL_HOST', 'localhost')
+    MYSQL_PORT = int(os.environ.get('MYSQL_PORT', 3306))
+    MYSQL_USER = os.environ.get('MYSQL_USER', 'admin')
+    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD', '1234')
+    MYSQL_DB = os.environ.get('MYSQL_DB', 'hi_meow')
+    
     # SQLAlchemy configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        f'mysql+pymysql://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DB}'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # JWT configuration
@@ -21,7 +29,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///dev.db')
+    SQLALCHEMY_ECHO = True  # SQL 쿼리 로깅
 
 class TestingConfig(Config):
     """Testing configuration"""
@@ -32,6 +40,7 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production configuration"""
     DEBUG = False
+    SQLALCHEMY_ECHO = False
     # Use DATABASE_URL from environment in production
 
 # Configuration dictionary

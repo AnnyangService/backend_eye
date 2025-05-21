@@ -1,1 +1,0 @@
-"""Global exception package""" 
