@@ -2,16 +2,26 @@
 
 ## 설치 방법
 
-### 1. 필요한 패키지 설치
+### 1. Docker 설치
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) 설치
+- [Docker Compose](https://docs.docker.com/compose/install/) 설치
+
+### 2. 프로젝트 실행 (Docker)
 
 ```bash
-pip install flask-sqlalchemy flask-migrate mysqlclient
-```
+# 1. 도커 이미지 빌드 및 컨테이너 실행
+docker-compose up --build
 
-### 2. MySQL 실행 (Docker)
+# 2. 백그라운드에서 실행
+docker-compose up -d
 
-```bash
-docker run --name mysql -e MYSQL_ROOT_PASSWORD=password -p 3306:3306 -d mysql:8.0
+# 3. 로그 확인
+docker-compose logs -f
+
+# 4. 특정 서비스 로그만 확인
+docker-compose logs -f flask-app
+docker-compose logs -f mysql
 ```
 
 ### 3. 데이터베이스 초기화
@@ -37,6 +47,44 @@ flask db-upgrade
 
 ```bash
 flask init-db
+```
+
+## Docker 설정
+
+### 주요 설정
+
+- **MySQL**
+
+  - 포트: 3306
+  - 데이터베이스: hi_meow
+  - 사용자: admin
+  - 비밀번호: 1234
+  - 데이터 영속성: mysql_data 볼륨 사용
+
+- **Flask 앱**
+  - 포트: 5000
+  - 개발 모드: 활성화
+  - 코드 변경: 실시간 반영 (볼륨 마운트)
+  - Python 경로: /app
+
+### Docker 명령어
+
+```bash
+# 1. 컨테이너 중지
+docker-compose down
+
+# 2. 컨테이너 재시작
+docker-compose restart
+
+# 3. 특정 서비스만 재시작
+docker-compose restart flask-app
+
+# 4. 컨테이너 내부 접속
+docker-compose exec flask-app bash
+docker-compose exec mysql bash
+
+# 5. 볼륨 삭제 (데이터 초기화)
+docker-compose down -v
 ```
 
 ## 데이터베이스 마이그레이션
@@ -72,22 +120,6 @@ flask db upgrade
 flask db downgrade
 ```
 
-## 프로젝트 구조
-
-```
-app/
-├── common/           # 공통 모듈
-│   ├── database/    # 데이터베이스 관련
-│   ├── response/    # API 응답 관련
-│   └── util/        # 유틸리티 함수
-├── diagnosis/       # 진단 관련 모듈
-│   ├── models.py    # 데이터베이스 모델
-│   ├── routes.py    # API 라우트
-│   ├── schemas.py   # 요청/응답 스키마
-│   └── service.py   # 비즈니스 로직
-└── __init__.py      # 앱 초기화
-```
-
 ## API 응답 형식
 
 ```json
@@ -115,3 +147,9 @@ app/
   }
 }
 ```
+
+## 주의사항
+
+- 데이터베이스 데이터는 `mysql_data` 볼륨에 저장됨
+- 코드 변경은 실시간으로 반영됨
+- 환경변수는 `docker-compose.yml`에서 관리
