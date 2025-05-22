@@ -17,7 +17,10 @@ def create_app(config_name='development'):
     
     # Initialize extensions with app
     db.init_app(app)
-    migrate.init_app(app, db, render_as_batch=True)
+    
+    # Initialize migrations only if enabled in config
+    if app.config.get('ENABLE_MIGRATIONS', True):
+        migrate.init_app(app, db, render_as_batch=True)
     
     # Import models to ensure they are registered with SQLAlchemy
     from app.diagnosis.models import DiagnosisLevel1, DiagnosisLevel2, DiagnosisLevel3, DiagnosisTarget, DiagnosisRule, DiagnosisRuleDescription

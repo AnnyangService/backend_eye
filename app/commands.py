@@ -3,11 +3,15 @@ import click
 from flask.cli import with_appcontext
 from app import db
 from flask_migrate import upgrade, migrate, init
+from flask import current_app
 
 @click.command('init-db')
 @with_appcontext
 def init_db_command():
     """Clear the existing data and create new tables."""
+    if not current_app.config.get('ENABLE_MIGRATIONS', True):
+        click.echo('Error: Database migrations are disabled in production environment.')
+        return
     db.drop_all()
     db.create_all()
     click.echo('Initialized the database.')
@@ -20,6 +24,9 @@ def register_commands(app):
     @with_appcontext
     def db_init():
         """Initialize database migrations"""
+        if not current_app.config.get('ENABLE_MIGRATIONS', True):
+            click.echo('Error: Database migrations are disabled in production environment.')
+            return
         init()
         click.echo('Database migrations initialized')
 
@@ -27,6 +34,9 @@ def register_commands(app):
     @with_appcontext
     def db_migrate():
         """Create a new migration"""
+        if not current_app.config.get('ENABLE_MIGRATIONS', True):
+            click.echo('Error: Database migrations are disabled in production environment.')
+            return
         migrate()
         click.echo('New migration created')
 
@@ -34,5 +44,8 @@ def register_commands(app):
     @with_appcontext
     def db_upgrade():
         """Apply database migrations"""
+        if not current_app.config.get('ENABLE_MIGRATIONS', True):
+            click.echo('Error: Database migrations are disabled in production environment.')
+            return
         upgrade()
         click.echo('Database migrations applied') 

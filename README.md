@@ -24,7 +24,84 @@ docker-compose logs -f flask-app
 docker-compose logs -f mysql
 ```
 
-### 3. 데이터베이스 초기화
+### 3. 환경 설정
+
+#### 환경 구분
+
+- **개발 환경 (Development)**
+
+  ```bash
+  export FLASK_ENV=development
+  # 또는
+  export FLASK_APP="app:create_app('development')"
+  ```
+
+- **배포 환경 (Production)**
+  ```bash
+  export FLASK_ENV=production
+  # 또는
+  export FLASK_APP="app:create_app('production')"
+  ```
+
+#### Docker 환경 설정
+
+`docker-compose.yml`에서 환경 변수 설정:
+
+```yaml
+services:
+  flask-app:
+    environment:
+      - FLASK_ENV=development # 또는 production
+```
+
+#### EC2 환경 설정
+
+1. **환경 변수로 설정**
+
+   ```bash
+   # 환경 변수 설정
+   export FLASK_ENV=production
+   export FLASK_APP="app:create_app('production')"
+
+   # 앱 실행
+   flask run
+   ```
+
+2. **직접 config 지정**
+
+   ```bash
+   flask --app "app:create_app('production')" run
+   ```
+
+3. **systemd 서비스로 실행**
+   `/etc/systemd/system/flask-app.service`:
+
+   ```ini
+   [Unit]
+   Description=Flask Application
+   After=network.target
+
+   [Service]
+   User=ubuntu
+   WorkingDirectory=/path/to/your/app
+   Environment="FLASK_ENV=production"
+   Environment="FLASK_APP=app:create_app('production')"
+   ExecStart=/usr/local/bin/flask run --host=0.0.0.0
+   Restart=always
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   서비스 시작:
+
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl start flask-app
+   sudo systemctl enable flask-app
+   ```
+
+### 4. 데이터베이스 초기화
 
 처음 한 번만 실행:
 
@@ -32,7 +109,7 @@ docker-compose logs -f mysql
 flask db-init
 ```
 
-### 4. 모델 변경 후 마이그레이션
+### 5. 모델 변경 후 마이그레이션
 
 모델을 수정한 후에는 다음 명령어를 실행:
 
@@ -41,7 +118,7 @@ flask db-migrate
 flask db-upgrade
 ```
 
-### 5. 데이터베이스 초기화 (모든 데이터 삭제)
+### 6. 데이터베이스 초기화 (모든 데이터 삭제)
 
 주의: 이 명령어는 모든 데이터를 삭제합니다!
 
@@ -89,6 +166,19 @@ docker-compose down -v
 
 ## 데이터베이스 마이그레이션
 
+### 환경별 마이그레이션 설정
+
+- **개발 환경 (Development)**
+
+  - 마이그레이션 활성화
+  - `flask db migrate`, `flask db upgrade` 명령어 사용 가능
+  - 테이블 생성/수정 가능
+
+- **배포 환경 (Production)**
+  - 마이그레이션 비활성화
+  - Spring 서버가 데이터베이스 스키마 관리
+  - Flask 서버는 읽기 전용으로 동작
+
 ### 초기 설정
 
 처음 한 번만 실행:
@@ -119,6 +209,12 @@ flask db upgrade
 ```bash
 flask db downgrade
 ```
+
+### 주의사항
+
+- 개발 환경에서만 마이그레이션 명령어 사용
+- 배포 환경에서는 Spring 서버가 데이터베이스 스키마 관리
+- 두 서버가 동시에 마이그레이션을 시도하면 데이터베이스 상태가 꼬일 수 있음
 
 ## API 응답 형식
 
@@ -153,3 +249,4 @@ flask db downgrade
 - 데이터베이스 데이터는 `mysql_data` 볼륨에 저장됨
 - 코드 변경은 실시간으로 반영됨
 - 환경변수는 `docker-compose.yml`에서 관리
+- 배포 환경에서는 Spring 서버가 데이터베이스 스키마를 관리하므로 Flask 서버의 마이그레이션은 비활성화됨
