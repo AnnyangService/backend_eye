@@ -1,7 +1,8 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from config import config
+from app.config import config_by_name as config
+from app.common.response.api_response import ApiResponse
 
 # Initialize SQLAlchemy instance
 db = SQLAlchemy()
@@ -16,16 +17,13 @@ def create_app(config_name='development'):
     
     # Initialize extensions with app
     db.init_app(app)
-    migrate.init_app(app, db)
+    migrate.init_app(app, db, render_as_batch=True)
     
     # Register CLI commands
     from app.commands import register_commands
     register_commands(app)
     
     # Register blueprints
-    from app.user.routes import user_bp
-    app.register_blueprint(user_bp)
-    
     from app.diagnosis import diagnosis_bp
     app.register_blueprint(diagnosis_bp)
     

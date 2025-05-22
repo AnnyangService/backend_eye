@@ -23,9 +23,10 @@ def diagnose():
         # Validate against schema
         validated_data = request_schema.load(data)
         image_url = validated_data['image_url']
+        cat_id = validated_data['cat_id']
         
         # Process diagnosis
-        result = diagnosis_service.process_diagnosis(image_url)
+        result = diagnosis_service.process_diagnosis(image_url, cat_id)
         
         return ApiResponse.success(data=result)
         
