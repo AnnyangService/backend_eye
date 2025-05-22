@@ -9,19 +9,41 @@
 
 ### 2. 프로젝트 실행 (Docker)
 
+#### 개발 환경 (Development)
+
 ```bash
-# 1. 도커 이미지 빌드 및 컨테이너 실행
+# 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
+
+# 2. 개발 환경 설정 (docker-compose.yml 파일에 이미 설정되어 있음)
+# FLASK_ENV=development
+
+# 3. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
 docker-compose up --build
 
-# 2. 백그라운드에서 실행
+# 4. 백그라운드에서 실행
 docker-compose up -d
 
-# 3. 로그 확인
+# 5. 로그 확인
 docker-compose logs -f
+```
 
-# 4. 특정 서비스 로그만 확인
-docker-compose logs -f flask-app
-docker-compose logs -f mysql
+#### 배포 환경 (Production)
+
+```bash
+# 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
+
+# 2. 배포 환경으로 설정 변경
+# docker-compose.yml 파일의 environment 섹션에서 수정:
+# - "FLASK_ENV=production"
+
+# 3. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
+docker-compose up --build
+
+# 4. 백그라운드에서 실행
+docker-compose up -d
+
+# 5. 로그 확인
+docker-compose logs -f
 ```
 
 ### 3. 환경 설정
@@ -101,42 +123,25 @@ services:
    sudo systemctl enable flask-app
    ```
 
-### 4. 데이터베이스 초기화
+### 4. 데이터베이스 정보 확인
 
-처음 한 번만 실행:
-
-```bash
-flask db-init
-```
-
-### 5. 모델 변경 후 마이그레이션
-
-모델을 수정한 후에는 다음 명령어를 실행:
+데이터베이스 연결 정보 확인:
 
 ```bash
-flask db-migrate
-flask db-upgrade
-```
-
-### 6. 데이터베이스 초기화 (모든 데이터 삭제)
-
-주의: 이 명령어는 모든 데이터를 삭제합니다!
-
-```bash
-flask init-db
+flask db-info
 ```
 
 ## Docker 설정
 
 ### 주요 설정
 
-- **MySQL**
+- **데이터베이스 연결**
 
+  - Spring 앱에서 관리하는 MySQL 데이터베이스에 연결
   - 포트: 3306
   - 데이터베이스: hi_meow
   - 사용자: admin
   - 비밀번호: 1234
-  - 데이터 영속성: mysql_data 볼륨 사용
 
 - **Flask 앱**
   - 포트: 5000
@@ -158,63 +163,26 @@ docker-compose restart flask-app
 
 # 4. 컨테이너 내부 접속
 docker-compose exec flask-app bash
-docker-compose exec mysql bash
-
-# 5. 볼륨 삭제 (데이터 초기화)
-docker-compose down -v
 ```
 
 ## 데이터베이스 마이그레이션
 
-### 환경별 마이그레이션 설정
+### 환경별 데이터베이스 관리
 
 - **개발 환경 (Development)**
 
-  - 마이그레이션 활성화
-  - `flask db migrate`, `flask db upgrade` 명령어 사용 가능
-  - 테이블 생성/수정 가능
+  - API 서버(Spring)가 데이터베이스 스키마 관리
+  - 개발 환경에서는 Spring 앱이 실행하는 MySQL에 접속
 
 - **배포 환경 (Production)**
-  - 마이그레이션 비활성화
-  - Spring 서버가 데이터베이스 스키마 관리
-  - Flask 서버는 읽기 전용으로 동작
-
-### 초기 설정
-
-처음 한 번만 실행:
-
-```bash
-flask db init
-```
-
-### 모델 변경 시
-
-1. `models.py` 파일에서 모델 수정
-2. 변경사항 감지:
-
-```bash
-flask db migrate -m "변경 내용 설명"
-```
-
-3. 변경사항 적용:
-
-```bash
-flask db upgrade
-```
-
-### 롤백이 필요한 경우
-
-이전 버전으로 되돌리기:
-
-```bash
-flask db downgrade
-```
+  - API 서버(Spring)가 데이터베이스 스키마 관리
+  - 배포 환경에서는 배포된 데이터베이스에 접속
 
 ### 주의사항
 
-- 개발 환경에서만 마이그레이션 명령어 사용
-- 배포 환경에서는 Spring 서버가 데이터베이스 스키마 관리
-- 두 서버가 동시에 마이그레이션을 시도하면 데이터베이스 상태가 꼬일 수 있음
+- 데이터베이스 스키마와 마이그레이션은 Spring API 서버에서 전적으로 관리
+- Flask 서버는 데이터베이스 읽기/쓰기만 수행하고 스키마 변경은 하지 않음
+- 스키마 변경이 필요한 경우 API 서버 관리자에게 요청
 
 ## API 응답 형식
 
@@ -246,7 +214,7 @@ flask db downgrade
 
 ## 주의사항
 
-- 데이터베이스 데이터는 `mysql_data` 볼륨에 저장됨
 - 코드 변경은 실시간으로 반영됨
 - 환경변수는 `docker-compose.yml`에서 관리
-- 배포 환경에서는 Spring 서버가 데이터베이스 스키마를 관리하므로 Flask 서버의 마이그레이션은 비활성화됨
+- 데이터베이스 스키마와 마이그레이션은 API 서버(Spring)에서 관리함
+- 개발 환경에서는 Spring 앱이 실행하는 MySQL에 접속하고, 배포 환경에서는 배포된 데이터베이스에 접속
