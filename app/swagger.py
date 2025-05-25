@@ -2,7 +2,7 @@ from flask_restx import Api
 from flask import Blueprint
 
 # Create a blueprint for API
-api_bp = Blueprint('api', __name__, url_prefix='/api')
+api_bp = Blueprint('api', __name__)
 
 # Initialize Flask-RESTX API
 api = Api(
@@ -10,8 +10,7 @@ api = Api(
     version='1.0',
     title='Backend Eye API',
     description='API documentation for Backend Eye service',
-    doc='/docs/',  # Swagger UI will be available at /api/docs/
-    prefix='/api'
+    doc='/docs/'  # Swagger UI will be available at /docs/
 )
 
 # Import namespaces here to register them with the API

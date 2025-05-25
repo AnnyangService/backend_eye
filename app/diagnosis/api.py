@@ -1,68 +1,127 @@
 from flask import request
 from flask_restx import Namespace, Resource, fields
 from .service import DiagnosisService
-from app.common.response.api_response import ApiResponse
-from app.common.response.error_response import ErrorCode
 
 # Create namespace for diagnosis API
-diagnosis_ns = Namespace('diagnosis', description='Diagnosis operations')
+diagnosis_ns = Namespace('diagnosis', description='질병 진단 API')
 
-# Define request model for Swagger documentation
-diagnosis_request_model = diagnosis_ns.model('DiagnosisRequest', {
-    'image_url': fields.Url(required=True, description='URL of the image to diagnose'),
-    'cat_id': fields.String(required=True, description='Category ID for diagnosis')
+# Define request model for Step1
+step1_request_model = diagnosis_ns.model('Step1Request', {
+    'image_url': fields.Url(required=True, description='분석할 이미지의 URL')
 })
 
-# Define response models
-diagnosis_response_model = diagnosis_ns.model('DiagnosisResponse', {
-    'success': fields.Boolean(description='Whether the request was successful'),
-    'data': fields.Raw(description='Diagnosis result data'),
-    'message': fields.String(description='Response message')
+# Define response models for Step1
+step1_data_model = diagnosis_ns.model('Step1Data', {
+    'is_normal': fields.Boolean(required=True, description='정상 여부 (true: 정상, false: 이상)'),
+    'confidence': fields.Float(required=True, description='신뢰도 (0.0 ~ 1.0)')
+})
+
+step1_response_model = diagnosis_ns.model('Step1Response', {
+    'success': fields.Boolean(required=True, description='요청 성공 여부'),
+    'message': fields.String(required=True, description='응답 메시지'),
+    'data': fields.Nested(step1_data_model, required=True, description='진단 결과 데이터')
 })
 
 error_response_model = diagnosis_ns.model('ErrorResponse', {
-    'success': fields.Boolean(description='Whether the request was successful'),
-    'error_code': fields.String(description='Error code'),
-    'message': fields.String(description='Error message'),
-    'details': fields.Raw(description='Error details')
+    'success': fields.Boolean(description='요청 성공 여부'),
+    'error_code': fields.String(description='에러 코드'),
+    'message': fields.String(description='에러 메시지'),
+    'details': fields.Raw(description='에러 상세 정보')
 })
 
-# Initialize services
-diagnosis_service = DiagnosisService()
+# Initialize service
+try:
+    diagnosis_service = DiagnosisService()
+except Exception as e:
+    # AI 모델 로드 실패 시 서비스 객체를 None으로 설정
+    diagnosis_service = None
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.error(f"DiagnosisService 초기화 실패: {str(e)}")
 
-@diagnosis_ns.route('/v1/diagnosis')
-class DiagnosisResource(Resource):
-    @diagnosis_ns.doc('diagnose_image')
-    @diagnosis_ns.expect(diagnosis_request_model, validate=True)
-    @diagnosis_ns.marshal_with(diagnosis_response_model, code=200)
-    @diagnosis_ns.marshal_with(error_response_model, code=400)
-    @diagnosis_ns.marshal_with(error_response_model, code=500)
+@diagnosis_ns.route('/step1/')
+class DiagnosisStep1Resource(Resource):
+    @diagnosis_ns.doc('질병여부판단')
+    @diagnosis_ns.expect(step1_request_model, validate=True)
+    # @diagnosis_ns.marshal_with(step1_response_model, code=200)
+    # @diagnosis_ns.marshal_with(error_response_model, code=400)
+    # @diagnosis_ns.marshal_with(error_response_model, code=500)
+    # @diagnosis_ns.marshal_with(error_response_model, code=503)
     def post(self):
         """
-        Perform diagnosis on an image
+        질병분석 Step1 - 질병여부판단
         
-        This endpoint accepts an image URL and category ID to perform diagnosis.
+        이미지를 분석하여 질병 여부를 판단합니다.
         """
         try:
-            # Flask-RESTX automatically validates and parses the request
+            # 서비스 초기화 확인
+            if diagnosis_service is None:
+                return {
+                    'success': False,
+                    'error_code': 'SERVICE_UNAVAILABLE',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다. 서버 관리자에게 문의하세요.',
+                    'details': {'service': 'AI model not loaded'}
+                }, 503
+            
+            # Flask-RESTX가 자동으로 검증한 데이터 가져오기
             data = request.get_json()
             
             if not data:
-                return ApiResponse.error(
-                    error_code=ErrorCode.VALIDATION_ERROR,
-                    details={"body": "Request body is required"}
-                )
+                return {
+                    'success': False,
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': 'Request body is required',
+                    'details': {'body': 'Request body is required'}
+                }, 400
             
-            # Extract validated data
             image_url = data.get('image_url')
-            cat_id = data.get('cat_id')
             
-            # Process diagnosis
-            result = diagnosis_service.process_diagnosis(image_url, cat_id)
+            # URL 기본 검증
+            if not image_url or image_url == "string":
+                return {
+                    'success': False,
+                    'error_code': 'INVALID_URL',
+                    'message': 'Invalid image URL provided',
+                    'details': {'image_url': 'Please provide a valid image URL'}
+                }, 400
             
-            return ApiResponse.success(data=result)
+            # Step1 진단 처리
+            result = diagnosis_service.process_step1_diagnosis(image_url)
+            
+            # 디버깅: 서비스 결과 로그 출력
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"API에서 받은 서비스 결과: {result}")
+            logger.info(f"결과 타입: {type(result)}")
+            if result:
+                logger.info(f"is_normal: {result.get('is_normal')} (타입: {type(result.get('is_normal'))})")
+                logger.info(f"confidence: {result.get('confidence')} (타입: {type(result.get('confidence'))})")
+            
+            response_data = {
+                'success': True,
+                'message': 'Success',
+                'data': result
+            }
+            
+            logger.info(f"최종 응답 데이터: {response_data}")
+            
+            return response_data, 200
             
         except Exception as e:
-            return ApiResponse.error(
-                error_code=ErrorCode.INTERNAL_ERROR
-            ) 
+            error_message = str(e)
+            
+            # AI 모델 관련 에러인지 확인
+            if "AI 모델이 로드되지 않았습니다" in error_message:
+                return {
+                    'success': False,
+                    'error_code': 'MODEL_NOT_AVAILABLE',
+                    'message': error_message,
+                    'details': {'model': 'AI model not loaded or failed to initialize'}
+                }, 503
+            
+            return {
+                'success': False,
+                'error_code': 'INTERNAL_ERROR',
+                'message': error_message,
+                'details': {'error': error_message}
+            }, 500 

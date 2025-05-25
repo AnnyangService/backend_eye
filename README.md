@@ -7,23 +7,63 @@
 - [Docker Desktop](https://www.docker.com/products/docker-desktop) 설치
 - [Docker Compose](https://docs.docker.com/compose/install/) 설치
 
-### 2. 프로젝트 실행 (Docker)
+### 2. AI 모델 설정
+
+#### 모델 파일 준비
+
+Step1 질병여부판단 모델을 다음 경로에 배치해야 합니다:
+
+```
+app/diagnosis/models/step1/
+```
+
+지원하는 모델 파일 형식:
+
+- `best_model.pth` (권장)
+- `step1` (바이너리 파일)
+- `model.pth`
+
+#### 모델 요구사항
+
+- **모델 타입**: EfficientNet-B2
+- **클래스 수**: 2 (normal, abnormal)
+- **입력 크기**: 224x224
+- **전처리**: ImageNet 표준 정규화
+
+#### 환경 변수 설정
+
+모델 경로는 환경 변수로 설정할 수 있습니다:
+
+```bash
+export STEP1_MODEL_PATH=app/diagnosis/models/step1
+```
+
+또는 `docker-compose.yml`에서:
+
+```yaml
+environment:
+  - STEP1_MODEL_PATH=app/diagnosis/models/step1
+```
+
+### 3. 프로젝트 실행 (Docker)
 
 #### 개발 환경 (Development)
 
 ```bash
 # 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
 
-# 2. 개발 환경 설정 (docker-compose.yml 파일에 이미 설정되어 있음)
+# 2. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
+
+# 3. 개발 환경 설정 (docker-compose.yml 파일에 이미 설정되어 있음)
 # FLASK_ENV=development
 
-# 3. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
+# 4. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
 docker-compose up --build
 
-# 4. 백그라운드에서 실행
+# 5. 백그라운드에서 실행
 docker-compose up -d
 
-# 5. 로그 확인
+# 6. 로그 확인
 docker-compose logs -f
 ```
 
@@ -32,21 +72,23 @@ docker-compose logs -f
 ```bash
 # 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
 
-# 2. 배포 환경으로 설정 변경
+# 2. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
+
+# 3. 배포 환경으로 설정 변경
 # docker-compose.yml 파일의 environment 섹션에서 수정:
 # - "FLASK_ENV=production"
 
-# 3. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
+# 4. Flask 앱 도커 이미지 빌드 및 컨테이너 실행
 docker-compose up --build
 
-# 4. 백그라운드에서 실행
+# 5. 백그라운드에서 실행
 docker-compose up -d
 
-# 5. 로그 확인
+# 6. 로그 확인
 docker-compose logs -f
 ```
 
-### 3. 환경 설정
+### 4. 환경 설정
 
 #### 환경 구분
 
@@ -74,6 +116,10 @@ services:
   flask-app:
     environment:
       - FLASK_ENV=development # 또는 production
+      - STEP1_MODEL_PATH=app/diagnosis/models/step1
+      - MAX_IMAGE_SIZE=4096
+      - MIN_IMAGE_SIZE=100
+      - IMAGE_DOWNLOAD_TIMEOUT=30
 ```
 
 #### EC2 환경 설정
@@ -84,6 +130,7 @@ services:
    # 환경 변수 설정
    export FLASK_ENV=production
    export FLASK_APP="app:create_app('production')"
+   export STEP1_MODEL_PATH=app/diagnosis/models/step1
 
    # 앱 실행
    flask run
@@ -108,6 +155,7 @@ services:
    WorkingDirectory=/path/to/your/app
    Environment="FLASK_ENV=production"
    Environment="FLASK_APP=app:create_app('production')"
+   Environment="STEP1_MODEL_PATH=app/diagnosis/models/step1"
    ExecStart=/usr/local/bin/flask run --host=0.0.0.0
    Restart=always
 
@@ -123,13 +171,42 @@ services:
    sudo systemctl enable flask-app
    ```
 
-### 4. 데이터베이스 정보 확인
+### 5. 데이터베이스 정보 확인
 
 데이터베이스 연결 정보 확인:
 
 ```bash
 flask db-info
 ```
+
+## AI 모델 정보
+
+### Step1 질병여부판단 모델
+
+- **목적**: 이미지에서 질병 여부를 판단
+- **입력**: 이미지 URL
+- **출력**: 정상/이상 여부 + 신뢰도
+
+#### 모델 아키텍처
+
+- **베이스 모델**: EfficientNet-B2
+- **분류 클래스**: 2개 (normal, abnormal)
+- **입력 해상도**: 224x224 RGB
+- **전처리**: ImageNet 표준 정규화
+
+#### 성능 요구사항
+
+- **GPU**: CUDA 지원 GPU (권장)
+- **메모리**: 최소 2GB VRAM
+- **CPU**: 멀티코어 프로세서 (GPU 없는 경우)
+
+#### 에러 처리
+
+AI 모델 로드에 실패한 경우:
+
+- 서버 시작 시 모델 로드 실패 로그 출력
+- API 호출 시 503 Service Unavailable 에러 반환
+- 명확한 에러 메시지 제공 (서버 관리자 문의 안내)
 
 ## Swagger API 문서
 
@@ -150,11 +227,27 @@ flask db-info
 
 #### Diagnosis API
 
-- **POST /api/diagnosis/v1/diagnosis**: 이미지 진단 수행
+- **POST /api/diagnosis/step1/**: 질병여부판단
   - 요청 파라미터:
-    - `image_url` (string, required): 진단할 이미지의 URL
-    - `cat_id` (string, required): 진단 카테고리 ID
-  - 응답: 진단 결과 데이터
+    - `image_url` (string, required): 분석할 이미지의 URL
+  - 응답:
+    ```json
+    {
+      "success": true,
+      "message": "Success",
+      "data": {
+        "is_normal": false,
+        "confidence": 0.9
+      }
+    }
+    ```
+
+#### 이미지 요구사항
+
+- **지원 형식**: JPEG, PNG, GIF, BMP
+- **최소 크기**: 100x100 픽셀
+- **최대 크기**: 4096x4096 픽셀
+- **다운로드 제한시간**: 30초
 
 ## Docker 설정
 
@@ -173,6 +266,7 @@ flask db-info
   - 개발 모드: 활성화
   - 코드 변경: 실시간 반영 (볼륨 마운트)
   - Python 경로: /app
+  - AI 모델: GPU 지원 (CUDA 사용 가능 시)
 
 ### Docker 명령어
 
@@ -188,6 +282,9 @@ docker-compose restart flask-app
 
 # 4. 컨테이너 내부 접속
 docker-compose exec flask-app bash
+
+# 5. AI 모델 상태 확인
+docker-compose logs flask-app | grep -i "model"
 ```
 
 ## 데이터베이스 마이그레이션
@@ -211,13 +308,16 @@ docker-compose exec flask-app bash
 
 ## API 응답 형식
 
+성공 시:
+
 ```json
 {
   "success": true,
+  "message": "Success",
   "data": {
-    // 실제 데이터
-  },
-  "error": null
+    "is_normal": false,
+    "confidence": 0.9
+  }
 }
 ```
 
@@ -226,16 +326,62 @@ docker-compose exec flask-app bash
 ```json
 {
   "success": false,
-  "data": null,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "에러 메시지",
-    "details": {
-      // 상세 에러 정보
-    }
+  "error_code": "VALIDATION_ERROR",
+  "message": "Invalid image URL provided",
+  "details": {
+    "image_url": "Please provide a valid image URL"
   }
 }
 ```
+
+AI 모델 서비스 불가 시 (503):
+
+```json
+{
+  "success": false,
+  "error_code": "SERVICE_UNAVAILABLE",
+  "message": "AI 모델 서비스를 사용할 수 없습니다. 서버 관리자에게 문의하세요.",
+  "details": {
+    "service": "AI model not loaded"
+  }
+}
+```
+
+## 트러블슈팅
+
+### AI 모델 관련
+
+1. **모델 로드 실패**
+
+   ```bash
+   # 모델 파일 존재 확인
+   ls -la app/diagnosis/models/step1/
+
+   # 로그 확인
+   docker-compose logs flask-app | grep -i "model"
+   ```
+
+2. **GPU 사용 불가**
+
+   ```bash
+   # CUDA 사용 가능 여부 확인
+   docker-compose exec flask-app python -c "import torch; print(torch.cuda.is_available())"
+   ```
+
+3. **메모리 부족**
+   - Docker 메모리 제한 증가
+   - 이미지 크기 제한 조정 (MAX_IMAGE_SIZE)
+
+### 이미지 처리 관련
+
+1. **이미지 다운로드 실패**
+
+   - 네트워크 연결 확인
+   - 이미지 URL 유효성 확인
+   - 타임아웃 설정 조정 (IMAGE_DOWNLOAD_TIMEOUT)
+
+2. **이미지 크기 제한**
+   - MIN_IMAGE_SIZE, MAX_IMAGE_SIZE 환경 변수 조정
 
 ## 주의사항
 
@@ -243,3 +389,5 @@ docker-compose exec flask-app bash
 - 환경변수는 `docker-compose.yml`에서 관리
 - 데이터베이스 스키마와 마이그레이션은 API 서버(Spring)에서 관리함
 - 개발 환경에서는 Spring 앱이 실행하는 MySQL에 접속하고, 배포 환경에서는 배포된 데이터베이스에 접속
+- AI 모델 파일은 Git에 포함되지 않으므로 별도로 배치 필요
+- GPU 사용 시 CUDA 드라이버와 Docker GPU 지원 설정 필요

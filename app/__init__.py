@@ -16,7 +16,10 @@ def create_app(config_name='development'):
     db.init_app(app)
     
     # Import models to ensure they are registered with SQLAlchemy
-    from app.diagnosis.models import DiagnosisLevel1, DiagnosisLevel2, DiagnosisLevel3, DiagnosisTarget, DiagnosisRule, DiagnosisRuleDescription
+    from app.diagnosis.models import (
+        DiagnosisLevel1, DiagnosisLevel2, DiagnosisLevel3, 
+        DiagnosisTarget, DiagnosisRule, DiagnosisRuleDescription
+    )
     
     # Register CLI commands
     from app.commands import register_commands
