@@ -131,6 +131,31 @@ services:
 flask db-info
 ```
 
+## Swagger API 문서
+
+### 접속 방법
+
+애플리케이션 실행 후 다음 URL에서 Swagger UI에 접속할 수 있습니다:
+
+- **개발 환경**: http://localhost:5000/api/docs/
+- **배포 환경**: http://your-domain.com/api/docs/
+
+### 주요 기능
+
+- **자동화된 API 문서**: 각 엔드포인트를 직접 테스트할 수 있습니다
+- **요청/응답 스키마**: 모든 API의 입력과 출력 형식을 확인할 수 있습니다
+- **에러 코드 문서화**: 각 API에서 발생할 수 있는 에러 코드와 메시지를 확인할 수 있습니다
+
+### API 엔드포인트
+
+#### Diagnosis API
+
+- **POST /api/diagnosis/v1/diagnosis**: 이미지 진단 수행
+  - 요청 파라미터:
+    - `image_url` (string, required): 진단할 이미지의 URL
+    - `cat_id` (string, required): 진단 카테고리 ID
+  - 응답: 진단 결과 데이터
+
 ## Docker 설정
 
 ### 주요 설정
