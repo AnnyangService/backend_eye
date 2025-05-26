@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class DiagnosisService:
     def __init__(self):
         # 이미지 저장 디렉토리 설정
-        self.images_dir = os.path.join(os.getcwd(), 'images')
+        self.images_dir = os.path.join(current_app.instance_path, 'images')
         if not os.path.exists(self.images_dir):
             os.makedirs(self.images_dir, exist_ok=True)
         
