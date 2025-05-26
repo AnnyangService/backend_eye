@@ -17,6 +17,7 @@ class Config:
     
     # AI 모델 설정
     STEP1_MODEL_PATH = os.environ.get('STEP1_MODEL_PATH') or 'app/diagnosis/models/step1'
+    STEP2_MODEL_PATH = os.environ.get('STEP2_MODEL_PATH') or 'app/diagnosis/models/step2'
     
     # 이미지 처리 설정
     MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', '4096'))
