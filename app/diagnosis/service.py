@@ -2,6 +2,7 @@ import os
 import urllib.parse
 import logging
 import requests
+import threading
 from PIL import Image
 from flask import current_app
 from .ai_model import DiagnosisModel
@@ -249,4 +250,153 @@ class DiagnosisService:
             error_msg = f"Step2 진단 처리 중 오류 발생: {str(e)}"
             logger.error(error_msg)
             raise Exception(error_msg)
+
+    def process_step2_diagnosis_async(self, request_id, password, image_url):
+        """
+        Step2: 비동기 진단 처리
+        
+        즉시 응답을 반환하고 백그라운드에서 추론을 실행한 후 API 서버로 결과를 전송합니다.
+        
+        Args:
+            request_id (str): 요청 ID
+            password (str): AI 서버 -> API 서버 호출시 필요한 패스워드
+            image_url (str): 분석할 이미지의 URL
+            
+        Returns:
+            dict: 즉시 응답 (data는 항상 null)
+        """
+        logger.info(f"Step2 비동기 진단 요청 접수: ID={request_id}, URL={image_url}")
+        
+        # 현재 Flask 앱 인스턴스를 백그라운드 스레드로 전달
+        app = current_app._get_current_object()
+        
+        # 백그라운드 스레드에서 실제 추론 실행
+        thread = threading.Thread(
+            target=self._process_step2_background,
+            args=(app, request_id, password, image_url)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        # 즉시 응답 반환
+        return {
+            "success": True,
+            "message": "Success",
+            "data": None
+        }
+    
+    def _process_step2_background(self, app, request_id, password, image_url):
+        """
+        백그라운드에서 Step2 추론을 실행하고 결과를 API 서버로 전송합니다.
+        """
+        # Flask 앱 컨텍스트 설정
+        with app.app_context():
+            try:
+                logger.info(f"Step2 백그라운드 추론 시작: ID={request_id}")
+                
+                # 1. 이미지 다운로드
+                local_path = self._download_image(image_url)
+                
+                # 2. 이미지 로드 및 검증
+                image = Image.open(local_path)
+                self._validate_image(image)
+                
+                logger.info(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
+                
+                # 3. AI 모델 분석
+                if self.step2_model and self.step2_model.is_model_loaded():
+                    logger.info(f"Step2 AI 모델 분석 시작: {local_path}")
+                    
+                    # 실제 AI 모델 추론
+                    prediction_result = self.step2_model.predict(image)
+                    
+                    # 4. API 서버로 성공 결과 전송
+                    callback_data = {
+                        "id": request_id,
+                        "password": password,
+                        "category": prediction_result['category'],
+                        "confidence": prediction_result['confidence'],
+                        "error": False,
+                        "message": None
+                    }
+                    
+                    self._send_callback_to_api_server(app, callback_data)
+                    
+                    logger.info(f"Step2 백그라운드 처리 완료: ID={request_id}, 카테고리={prediction_result['category']}")
+                    
+                else:
+                    # AI 모델이 로드되지 않은 경우
+                    error_msg = "Step2 AI 모델이 로드되지 않았습니다."
+                    logger.error(error_msg)
+                    
+                    # 에러를 API 서버로 전송
+                    self._send_error_to_api_server(app, request_id, password, error_msg)
+                    
+            except Exception as e:
+                error_msg = f"Step2 백그라운드 처리 중 오류 발생: {str(e)}"
+                logger.error(error_msg)
+                
+                # 에러를 API 서버로 전송
+                self._send_error_to_api_server(app, request_id, password, error_msg)
+    
+    def _send_callback_to_api_server(self, app, callback_data):
+        """
+        Step2 결과를 API 서버로 전송합니다.
+        
+        Args:
+            app: Flask 앱 인스턴스
+            callback_data (dict): 전송할 데이터
+        """
+        try:
+            # API 서버 URL 구성
+            api_server_url = app.config.get('API_SERVER_URL')
+            callback_endpoint = app.config.get('API_SERVER_CALLBACK_ENDPOINT', '/diagnosis/step2/callback')
+            
+            callback_url = f"{api_server_url}{callback_endpoint}"
+            
+            logger.info(f"API 서버로 콜백 전송 시작: {callback_url}")
+            logger.info(f"콜백 데이터: {callback_data}")
+            
+            # POST 요청 전송
+            timeout = app.config.get('IMAGE_DOWNLOAD_TIMEOUT', 30)
+            
+            response = requests.post(
+                callback_url,
+                json=callback_data,
+                headers={'Content-Type': 'application/json'},
+                timeout=timeout
+            )
+            response.raise_for_status()
+            
+            logger.info(f"API 서버 콜백 전송 성공: {response.status_code}")
+        except requests.RequestException as e:
+            logger.error(f"API 서버 콜백 전송 실패: {str(e)}")
+        except Exception as e:
+            logger.error(f"콜백 전송 중 예상치 못한 오류: {str(e)}")
+
+    def _send_error_to_api_server(self, app, request_id, password, error_message):
+        """
+        에러를 API 서버로 전송합니다.
+        
+        Args:
+            app: Flask 앱 인스턴스
+            request_id (str): 요청 ID
+            password (str): 패스워드
+            error_message (str): 에러 메시지
+        """
+        try:
+            callback_data = {
+                "id": request_id,
+                "password": password,
+                "category": None,
+                "confidence": None,
+                "error": True,
+                "message": error_message
+            }
+            
+            logger.info(f"에러 콜백 전송: ID={request_id}, 에러={error_message}")
+            self._send_callback_to_api_server(app, callback_data)
+            
+        except Exception as e:
+            logger.error(f"에러 콜백 전송 중 오류: {str(e)}")
 

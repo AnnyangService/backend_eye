@@ -29,16 +29,11 @@ step1_response_model = diagnosis_ns.model('Step1Response', {
     'data': fields.Nested(step1_data_model, required=True, description='진단 결과 데이터')
 })
 
-# Define response models for Step2
-step2_data_model = diagnosis_ns.model('Step2Data', {
-    'category': fields.String(required=True, description='질병 카테고리 (corneal 또는 inflammation)'),
-    'confidence': fields.Float(required=True, description='신뢰도 (0.0 ~ 1.0)')
-})
-
+# Define response model for Step2 (즉시 응답)
 step2_response_model = diagnosis_ns.model('Step2Response', {
     'success': fields.Boolean(required=True, description='요청 성공 여부'),
     'message': fields.String(required=True, description='응답 메시지'),
-    'data': fields.Nested(step2_data_model, required=True, description='Step2 진단 결과 데이터')
+    'data': fields.Raw(description='항상 null (비동기 처리로 인해 즉시 응답)')
 })
 
 error_response_model = diagnosis_ns.model('ErrorResponse', {
@@ -192,18 +187,14 @@ class DiagnosisStep2Resource(Resource):
                         'details': {field: f'{field} is required'}
                     }, 400
             
-            # Step2 진단 처리
-            result = diagnosis_service.process_step2_diagnosis(
+            # Step2 비동기 진단 처리 (즉시 응답)
+            result = diagnosis_service.process_step2_diagnosis_async(
                 data['id'], 
                 data['password'], 
                 data['image_url']
             )
             
-            response_data = {
-                'success': True,
-                'message': 'Success',
-                'data': result
-            }
+            response_data = result  # 이미 올바른 형식으로 반환됨
             
             return response_data, 200
             
