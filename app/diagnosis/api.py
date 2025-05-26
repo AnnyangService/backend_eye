@@ -16,10 +16,24 @@ step1_data_model = diagnosis_ns.model('Step1Data', {
     'confidence': fields.Float(required=True, description='신뢰도 (0.0 ~ 1.0)')
 })
 
+# Define request model for Step2
+step2_request_model = diagnosis_ns.model('Step2Request', {
+    'id': fields.String(required=True, description='요청 ID'),
+    'password': fields.String(required=True, description='AI 서버 -> API 서버 호출시 필요한 패스워드'),
+    'image_url': fields.Url(required=True, description='분석할 이미지의 URL')
+})
+
 step1_response_model = diagnosis_ns.model('Step1Response', {
     'success': fields.Boolean(required=True, description='요청 성공 여부'),
     'message': fields.String(required=True, description='응답 메시지'),
     'data': fields.Nested(step1_data_model, required=True, description='진단 결과 데이터')
+})
+
+# Define response model for Step2 (즉시 응답)
+step2_response_model = diagnosis_ns.model('Step2Response', {
+    'success': fields.Boolean(required=True, description='요청 성공 여부'),
+    'message': fields.String(required=True, description='응답 메시지'),
+    'data': fields.Raw(description='항상 null (비동기 처리로 인해 즉시 응답)')
 })
 
 error_response_model = diagnosis_ns.model('ErrorResponse', {
@@ -32,12 +46,17 @@ error_response_model = diagnosis_ns.model('ErrorResponse', {
 # Initialize service
 try:
     diagnosis_service = DiagnosisService()
+    print("✅ DiagnosisService 초기화 성공!")
 except Exception as e:
     # AI 모델 로드 실패 시 서비스 객체를 None으로 설정
     diagnosis_service = None
     import logging
+    import traceback
     logger = logging.getLogger(__name__)
     logger.error(f"DiagnosisService 초기화 실패: {str(e)}")
+    logger.error(f"상세 에러: {traceback.format_exc()}")
+    print(f"❌ DiagnosisService 초기화 실패: {str(e)}")
+    print(f"상세 에러: {traceback.format_exc()}")
 
 @diagnosis_ns.route('/step1/')
 class DiagnosisStep1Resource(Resource):
@@ -118,6 +137,69 @@ class DiagnosisStep1Resource(Resource):
                     'message': error_message,
                     'details': {'model': 'AI model not loaded or failed to initialize'}
                 }, 503
+            
+            return {
+                'success': False,
+                'error_code': 'INTERNAL_ERROR',
+                'message': error_message,
+                'details': {'error': error_message}
+            }, 500 
+
+@diagnosis_ns.route('/step2/')
+class DiagnosisStep2Resource(Resource):
+    @diagnosis_ns.doc('질병분석 Step2')
+    @diagnosis_ns.expect(step2_request_model, validate=True)
+    def post(self):
+        """
+        질병분석 Step2
+        
+        Step2 진단을 위한 요청을 처리합니다.
+        """
+        try:
+            # 서비스 초기화 확인
+            if diagnosis_service is None:
+                return {
+                    'success': False,
+                    'error_code': 'SERVICE_UNAVAILABLE',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다. 서버 관리자에게 문의하세요.',
+                    'details': {'service': 'AI model not loaded'}
+                }, 503
+            
+            # Flask-RESTX가 자동으로 검증한 데이터 가져오기
+            data = request.get_json()
+            
+            if not data:
+                return {
+                    'success': False,
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': 'Request body is required',
+                    'details': {'body': 'Request body is required'}
+                }, 400
+            
+            # 필수 필드 검증
+            required_fields = ['id', 'password', 'image_url']
+            for field in required_fields:
+                if not data.get(field):
+                    return {
+                        'success': False,
+                        'error_code': 'VALIDATION_ERROR',
+                        'message': f'{field} is required',
+                        'details': {field: f'{field} is required'}
+                    }, 400
+            
+            # Step2 비동기 진단 처리 (즉시 응답)
+            result = diagnosis_service.process_step2_diagnosis_async(
+                data['id'], 
+                data['password'], 
+                data['image_url']
+            )
+            
+            response_data = result  # 이미 올바른 형식으로 반환됨
+            
+            return response_data, 200
+            
+        except Exception as e:
+            error_message = str(e)
             
             return {
                 'success': False,
