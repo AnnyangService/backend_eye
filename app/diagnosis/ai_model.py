@@ -10,25 +10,39 @@ from flask import current_app
 
 logger = logging.getLogger(__name__)
 
-class Step1Model:
-    """Step1 질병여부판단 AI 모델 클래스"""
+class DiagnosisModel:
+    """질병 진단 AI 모델 클래스"""
     
-    def __init__(self, model_path=None):
+    def __init__(self, model_path=None, model_type="step1"):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = None
         self.model_type = "efficientnet-b2"
         self.img_size = 224
-        self.num_classes = 2  # normal, abnormal
-        self.class_names = ['abnormal', 'normal']  # 0: abnormal, 1: normal
+        self.num_classes = 2
+        
+        # 모델 타입에 따라 클래스 이름 설정
+        self.diagnosis_type = model_type
+        if model_type == "step1":
+            self.class_names = ['abnormal', 'normal']  # 0: abnormal, 1: normal
+        elif model_type == "step2":
+            self.class_names = ['corneal', 'inflammation']  # 0: corneal, 1: inflammation
+        else:
+            self.class_names = ['class_0', 'class_1']  # 기본값
         
         # 모델 경로 설정
         if model_path is None:
             try:
                 # Flask 앱 컨텍스트에서 config 가져오기
-                model_path = current_app.config.get('STEP1_MODEL_PATH')
+                if model_type == "step1":
+                    model_path = current_app.config.get('STEP1_MODEL_PATH')
+                elif model_type == "step2":
+                    model_path = current_app.config.get('STEP2_MODEL_PATH')
+                
+                if model_path is None:
+                    model_path = os.path.join(os.path.dirname(__file__), 'models', model_type)
             except RuntimeError:
                 # Flask 앱 컨텍스트가 없는 경우 기본 경로 사용
-                model_path = os.path.join(os.path.dirname(__file__), 'models', 'step1')
+                model_path = os.path.join(os.path.dirname(__file__), 'models', model_type)
         
         self.model_path = model_path
         
@@ -53,10 +67,10 @@ class Step1Model:
                 # 파일 경로인 경우
                 model_file = self.model_path
             else:
-                # 디렉토리 경로인 경우 best_model.pth 또는 step1 파일 찾기
+                # 디렉토리 경로인 경우 모델 파일 찾기
                 possible_files = [
                     os.path.join(self.model_path, 'best_model.pth'),
-                    os.path.join(self.model_path, 'step1'),
+                    os.path.join(self.model_path, self.diagnosis_type),  # step1 또는 step2
                     os.path.join(self.model_path, 'model.pth')
                 ]
                 
@@ -177,20 +191,43 @@ class Step1Model:
             logger.info(f"Predicted class index: {predicted_class}")
             logger.info(f"Class names mapping: {dict(enumerate(self.class_names))}")
             
-            # 결과 해석
-            is_normal = (predicted_class == 1)  # 0: abnormal, 1: normal
-            
-            result = {
-                'is_normal': is_normal,
-                'confidence': float(confidence),
-                'predicted_class': self.class_names[predicted_class],
-                'predicted_class_index': predicted_class,
-                'probabilities': {
-                    'normal': float(probabilities[0][1]),      # 인덱스 1이 normal
-                    'abnormal': float(probabilities[0][0])     # 인덱스 0이 abnormal
-                },
-                'raw_outputs': outputs[0].tolist()  # 디버깅용
-            }
+            # 모델 타입에 따라 결과 해석
+            if self.diagnosis_type == "step1":
+                # Step1: 정상/비정상 분류
+                is_normal = (predicted_class == 1)  # 0: abnormal, 1: normal
+                result = {
+                    'is_normal': is_normal,
+                    'confidence': float(confidence),
+                    'predicted_class': self.class_names[predicted_class],
+                    'predicted_class_index': predicted_class,
+                    'probabilities': {
+                        'normal': float(probabilities[0][1]),      # 인덱스 1이 normal
+                        'abnormal': float(probabilities[0][0])     # 인덱스 0이 abnormal
+                    },
+                    'raw_outputs': outputs[0].tolist()  # 디버깅용
+                }
+            elif self.diagnosis_type == "step2":
+                # Step2: 질병 카테고리 분류
+                category = self.class_names[predicted_class]  # corneal 또는 inflammation
+                result = {
+                    'category': category,
+                    'confidence': float(confidence),
+                    'predicted_class': self.class_names[predicted_class],
+                    'predicted_class_index': predicted_class,
+                    'probabilities': {
+                        'corneal': float(probabilities[0][0]),        # 인덱스 0이 corneal
+                        'inflammation': float(probabilities[0][1])    # 인덱스 1이 inflammation
+                    },
+                    'raw_outputs': outputs[0].tolist()  # 디버깅용
+                }
+            else:
+                # 기본 결과
+                result = {
+                    'predicted_class': self.class_names[predicted_class],
+                    'confidence': float(confidence),
+                    'predicted_class_index': predicted_class,
+                    'raw_outputs': outputs[0].tolist()
+                }
             
             logger.info(f"Prediction result: {result}")
             return result
@@ -202,3 +239,5 @@ class Step1Model:
     def is_model_loaded(self):
         """모델이 로드되었는지 확인합니다."""
         return self.model is not None 
+
+ 
