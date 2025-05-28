@@ -1,10 +1,12 @@
-FROM python:3.12
-
+# stage 1 - builder
+FROM python:3.12 AS builder
 WORKDIR /app
-
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
-
-CMD ["flask", "run", "--host=0.0.0.0"]
+# stage 2 - runtime
+FROM python:3.12-slim
+WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY app/ ./app/
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0"]
