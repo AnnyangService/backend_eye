@@ -2,6 +2,7 @@ version: "3.8"
 
 services:
   flask-app:
+    platform: linux/amd64
     build: .
     ports:
       - "5000:5000"
@@ -16,6 +17,5 @@ services:
       - "MYSQL_DB=hi_meow"
     volumes:
       - .:/app
-    command: flask run --host=0.0.0.0
     extra_hosts:
       - "host.docker.internal:host-gateway"

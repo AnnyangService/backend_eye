@@ -47,6 +47,17 @@ error_response_model = diagnosis_ns.model('ErrorResponse', {
 try:
     diagnosis_service = DiagnosisService()
     print("✅ DiagnosisService 초기화 성공!")
+    
+    # 모델 정보 출력
+    model_info = diagnosis_service.get_model_info()
+    print(f"📱 AI Model Information:")
+    if model_info['step1_model_info']:
+        step1_info = model_info['step1_model_info']
+        print(f"   Step1: {step1_info['model_type']} ({'✅ Loaded' if step1_info['model_loaded'] else '❌ Failed'})")
+    if model_info['step2_model_info']:
+        step2_info = model_info['step2_model_info']
+        print(f"   Step2: {step2_info['model_type']} ({'✅ Loaded' if step2_info['model_loaded'] else '❌ Failed'})")
+        
 except Exception as e:
     # AI 모델 로드 실패 시 서비스 객체를 None으로 설정
     diagnosis_service = None
@@ -56,7 +67,39 @@ except Exception as e:
     logger.error(f"DiagnosisService 초기화 실패: {str(e)}")
     logger.error(f"상세 에러: {traceback.format_exc()}")
     print(f"❌ DiagnosisService 초기화 실패: {str(e)}")
-    print(f"상세 에러: {traceback.format_exc()}")
+    print(f"💡 AI 모델이 없다면 convert_to_mobile.py를 먼저 실행하세요.")
+
+@diagnosis_ns.route('/info/')
+class DiagnosisInfoResource(Resource):
+    @diagnosis_ns.doc('모델 정보 조회')
+    def get(self):
+        """
+        현재 로드된 AI 모델 정보를 조회합니다.
+        """
+        try:
+            if diagnosis_service is None:
+                return {
+                    'success': False,
+                    'error_code': 'SERVICE_UNAVAILABLE',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다.',
+                    'details': {'service': 'AI model not loaded'}
+                }, 503
+            
+            model_info = diagnosis_service.get_model_info()
+            
+            return {
+                'success': True,
+                'message': 'AI model information retrieved successfully',
+                'data': model_info
+            }, 200
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error_code': 'INTERNAL_ERROR',
+                'message': str(e),
+                'details': {'error': str(e)}
+            }, 500
 
 @diagnosis_ns.route('/step1/')
 class DiagnosisStep1Resource(Resource):
@@ -68,7 +111,7 @@ class DiagnosisStep1Resource(Resource):
     # @diagnosis_ns.marshal_with(error_response_model, code=503)
     def post(self):
         """
-        질병분석 Step1 - 질병여부판단
+        질병분석 Step1 - 질병여부판단 (PyTorch Mobile)
         
         이미지를 분석하여 질병 여부를 판단합니다.
         """
@@ -78,7 +121,7 @@ class DiagnosisStep1Resource(Resource):
                 return {
                     'success': False,
                     'error_code': 'SERVICE_UNAVAILABLE',
-                    'message': 'AI 모델 서비스를 사용할 수 없습니다. 서버 관리자에게 문의하세요.',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다.',
                     'details': {'service': 'AI model not loaded'}
                 }, 503
             
@@ -107,22 +150,12 @@ class DiagnosisStep1Resource(Resource):
             # Step1 진단 처리
             result = diagnosis_service.process_step1_diagnosis(image_url)
             
-            # 디버깅: 서비스 결과 로그 출력
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"API에서 받은 서비스 결과: {result}")
-            logger.info(f"결과 타입: {type(result)}")
-            if result:
-                logger.info(f"is_normal: {result.get('is_normal')} (타입: {type(result.get('is_normal'))})")
-                logger.info(f"confidence: {result.get('confidence')} (타입: {type(result.get('confidence'))})")
-            
+            # 디버깅 로그 제거 - 서비스에서 이미 로깅됨
             response_data = {
                 'success': True,
                 'message': 'Success',
                 'data': result
             }
-            
-            logger.info(f"최종 응답 데이터: {response_data}")
             
             return response_data, 200
             
@@ -151,7 +184,7 @@ class DiagnosisStep2Resource(Resource):
     @diagnosis_ns.expect(step2_request_model, validate=True)
     def post(self):
         """
-        질병분석 Step2
+        질병분석 Step2 (PyTorch Mobile)
         
         Step2 진단을 위한 요청을 처리합니다.
         """
@@ -161,7 +194,7 @@ class DiagnosisStep2Resource(Resource):
                 return {
                     'success': False,
                     'error_code': 'SERVICE_UNAVAILABLE',
-                    'message': 'AI 모델 서비스를 사용할 수 없습니다. 서버 관리자에게 문의하세요.',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다.',
                     'details': {'service': 'AI model not loaded'}
                 }, 503
             

@@ -43,15 +43,16 @@ class DiagnosisService:
     def _initialize_model(self):
         """AI 모델을 초기화합니다."""
         try:
-            logger.info("Step1 AI 모델 초기화 시작...")
-            step1_model_path = self._get_model_path('step1')
-            self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1")
-            logger.info("Step1 AI 모델 초기화 완료")
+            logger.info("AI 모델 초기화 시작...")
             
-            logger.info("Step2 AI 모델 초기화 시작...")
+            step1_model_path = self._get_model_path('step1')
+            self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1", use_mobile=True)
+            
             step2_model_path = self._get_model_path('step2')
-            self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2")
-            logger.info("Step2 AI 모델 초기화 완료")
+            self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2", use_mobile=True)
+            
+            logger.info("AI 모델 초기화 완료")
+            
         except Exception as e:
             logger.error(f"AI 모델 초기화 실패: {str(e)}")
             # 모델 로드 실패 시 None으로 설정
@@ -59,6 +60,23 @@ class DiagnosisService:
             self.step2_model = None
             # 에러를 다시 발생시켜서 서비스 초기화 시점에 문제를 알림
             raise Exception(f"AI 모델 로드 실패: {str(e)}")
+    
+    def get_model_info(self):
+        """현재 로드된 모델 정보를 반환합니다."""
+        info = {
+            "step1_model_loaded": self.step1_model is not None,
+            "step2_model_loaded": self.step2_model is not None,
+            "step1_model_info": None,
+            "step2_model_info": None
+        }
+        
+        if self.step1_model is not None:
+            info["step1_model_info"] = self.step1_model.get_model_info()
+        
+        if self.step2_model is not None:
+            info["step2_model_info"] = self.step2_model.get_model_info()
+        
+        return info
     
     def _download_image(self, image_url):
         """
@@ -81,11 +99,11 @@ class DiagnosisService:
         
         # 이미 파일이 있으면 기존 파일 사용
         if os.path.exists(local_path):
-            logger.info(f"기존 이미지 파일 사용: {local_path}")
+            logger.debug(f"기존 이미지 파일 사용: {local_path}")
             return local_path
         
         # 이미지 다운로드
-        logger.info(f"이미지 다운로드 시작: {image_url}")
+        logger.debug(f"이미지 다운로드 시작: {image_url}")
         
         # config에서 timeout 설정 가져오기
         try:
@@ -106,7 +124,7 @@ class DiagnosisService:
         with open(local_path, 'wb') as f:
             f.write(response.content)
         
-        logger.info(f"이미지 다운로드 완료: {local_path}")
+        logger.debug(f"이미지 다운로드 완료: {local_path}")
         return local_path
     
     def _validate_image(self, image):
@@ -131,7 +149,7 @@ class DiagnosisService:
             logger.error(error_msg)
             raise ValueError(error_msg)
         
-        logger.info(f"이미지 검증 완료: {image.width}x{image.height}")
+        logger.debug(f"이미지 검증 완료: {image.width}x{image.height}")
     
     def process_step1_diagnosis(self, image_url):
         """
@@ -158,11 +176,11 @@ class DiagnosisService:
             image = Image.open(local_path)
             self._validate_image(image)
             
-            logger.info(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
+            logger.debug(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
             
             # 3. AI 모델 분석
             if self.step1_model and self.step1_model.is_model_loaded():
-                logger.info(f"AI 모델 분석 시작: {local_path}")
+                logger.debug(f"AI 모델 분석 시작: {local_path}")
                 
                 # 실제 AI 모델 추론
                 prediction_result = self.step1_model.predict(image)
@@ -172,13 +190,12 @@ class DiagnosisService:
                     "confidence": prediction_result['confidence']
                 }
                 
-                logger.info(f"AI 분석 결과 - 정상: {result['is_normal']}, 신뢰도: {result['confidence']}")
-                logger.info(f"Step1 진단 완료: {result}")
+                logger.info(f"Step1 진단 완료 - 정상: {result['is_normal']}, 신뢰도: {result['confidence']:.3f}")
                 return result
                 
             else:
                 # AI 모델이 로드되지 않은 경우 에러 발생
-                error_msg = "AI 모델이 로드되지 않았습니다. 서버 관리자에게 문의하세요."
+                error_msg = "AI 모델이 로드되지 않았습니다."
                 logger.error(error_msg)
                 raise Exception(error_msg)
             
@@ -204,7 +221,7 @@ class DiagnosisService:
             
         Returns:
             dict: {
-                "is_normal": bool,    # 정상 여부
+                "category": str,      # 진단 카테고리
                 "confidence": float   # 신뢰도 (0.0 ~ 1.0)
             }
         """
@@ -218,11 +235,11 @@ class DiagnosisService:
             image = Image.open(local_path)
             self._validate_image(image)
             
-            logger.info(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
+            logger.debug(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
             
             # 3. AI 모델 분석
             if self.step2_model and self.step2_model.is_model_loaded():
-                logger.info(f"Step2 AI 모델 분석 시작: {local_path}")
+                logger.debug(f"Step2 AI 모델 분석 시작: {local_path}")
                 
                 # 실제 AI 모델 추론
                 prediction_result = self.step2_model.predict(image)
@@ -232,13 +249,12 @@ class DiagnosisService:
                     "confidence": prediction_result['confidence']
                 }
                 
-                logger.info(f"Step2 AI 분석 결과 - 카테고리: {result['category']}, 신뢰도: {result['confidence']}")
-                logger.info(f"Step2 진단 완료: {result}")
+                logger.info(f"Step2 진단 완료 - 카테고리: {result['category']}, 신뢰도: {result['confidence']:.3f}")
                 return result
                 
             else:
                 # AI 모델이 로드되지 않은 경우 에러 발생
-                error_msg = "Step2 AI 모델이 로드되지 않았습니다. 서버 관리자에게 문의하세요."
+                error_msg = "Step2 AI 모델이 로드되지 않았습니다."
                 logger.error(error_msg)
                 raise Exception(error_msg)
             
@@ -265,7 +281,7 @@ class DiagnosisService:
         Returns:
             dict: 즉시 응답 (data는 항상 null)
         """
-        logger.info(f"Step2 비동기 진단 요청 접수: ID={request_id}, URL={image_url}")
+        logger.info(f"Step2 비동기 진단 요청 접수: ID={request_id}")
         
         # 현재 Flask 앱 인스턴스를 백그라운드 스레드로 전달
         app = current_app._get_current_object()
@@ -292,7 +308,7 @@ class DiagnosisService:
         # Flask 앱 컨텍스트 설정
         with app.app_context():
             try:
-                logger.info(f"Step2 백그라운드 추론 시작: ID={request_id}")
+                logger.debug(f"Step2 백그라운드 추론 시작: ID={request_id}")
                 
                 # 1. 이미지 다운로드
                 local_path = self._download_image(image_url)
@@ -301,11 +317,11 @@ class DiagnosisService:
                 image = Image.open(local_path)
                 self._validate_image(image)
                 
-                logger.info(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
+                logger.debug(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
                 
                 # 3. AI 모델 분석
                 if self.step2_model and self.step2_model.is_model_loaded():
-                    logger.info(f"Step2 AI 모델 분석 시작: {local_path}")
+                    logger.debug(f"Step2 AI 모델 분석 시작: {local_path}")
                     
                     # 실제 AI 모델 추론
                     prediction_result = self.step2_model.predict(image)
@@ -354,8 +370,7 @@ class DiagnosisService:
             
             callback_url = f"{api_server_url}{callback_endpoint}"
             
-            logger.info(f"API 서버로 콜백 전송 시작: {callback_url}")
-            logger.info(f"콜백 데이터: {callback_data}")
+            logger.debug(f"API 서버로 콜백 전송 시작: {callback_url}")
             
             # POST 요청 전송
             timeout = app.config.get('IMAGE_DOWNLOAD_TIMEOUT', 30)
@@ -394,7 +409,7 @@ class DiagnosisService:
                 "message": error_message
             }
             
-            logger.info(f"에러 콜백 전송: ID={request_id}, 에러={error_message}")
+            logger.debug(f"에러 콜백 전송: ID={request_id}, 에러={error_message}")
             self._send_callback_to_api_server(app, callback_data)
             
         except Exception as e:

@@ -1,7 +1,5 @@
 import torch
-import torch.nn as nn
 from torchvision import transforms
-from efficientnet_pytorch import EfficientNet
 from PIL import Image
 import numpy as np
 import os
@@ -11,14 +9,12 @@ from flask import current_app
 logger = logging.getLogger(__name__)
 
 class DiagnosisModel:
-    """질병 진단 AI 모델 클래스"""
+    """질병 진단 AI 모델 클래스 (PyTorch Mobile)"""
     
     def __init__(self, model_path=None, model_type="step1"):
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device('cpu')  # Mobile 모델은 CPU에서 실행
         self.model = None
-        self.model_type = "efficientnet-b2"
         self.img_size = 224
-        self.num_classes = 2
         
         # 모델 타입에 따라 클래스 이름 설정
         self.diagnosis_type = model_type
@@ -32,7 +28,6 @@ class DiagnosisModel:
         # 모델 경로 설정
         if model_path is None:
             try:
-                # Flask 앱 컨텍스트에서 config 가져오기
                 if model_type == "step1":
                     model_path = current_app.config.get('STEP1_MODEL_PATH')
                 elif model_type == "step2":
@@ -41,7 +36,6 @@ class DiagnosisModel:
                 if model_path is None:
                     model_path = os.path.join(os.path.dirname(__file__), 'models', model_type)
             except RuntimeError:
-                # Flask 앱 컨텍스트가 없는 경우 기본 경로 사용
                 model_path = os.path.join(os.path.dirname(__file__), 'models', model_type)
         
         self.model_path = model_path
@@ -53,191 +47,235 @@ class DiagnosisModel:
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
         
-        # 모델 로드
-        self._load_model()
+        # PyTorch Mobile 모델 로드
+        self._load_mobile_model()
     
-    def _load_model(self):
-        """AI 모델을 로드합니다."""
+    def _get_mobile_model_path(self):
+        """모바일 모델 경로를 가져옵니다."""
+        if os.path.isfile(self.model_path):
+            base_path = os.path.dirname(self.model_path)
+            mobile_path = os.path.join(base_path, f"{self.diagnosis_type}_mobile.ptl")
+        else:
+            mobile_path = os.path.join(os.path.dirname(self.model_path), f"{self.diagnosis_type}_mobile.ptl")
+        
+        return mobile_path
+    
+    def _load_mobile_model(self):
+        """PyTorch Mobile 모델을 로드합니다."""
+        mobile_path = self._get_mobile_model_path()
+        
+        if not os.path.exists(mobile_path):
+            error_msg = f"PyTorch Mobile model not found at {mobile_path}. Please run utils/convert_to_mobile.py first."
+            logger.error(error_msg)
+            raise FileNotFoundError(error_msg)
+        
         try:
-            # EfficientNet 모델 생성
-            model = EfficientNet.from_pretrained(self.model_type, num_classes=self.num_classes)
-            
-            # 모델 파일 경로 확인
-            if os.path.isfile(self.model_path):
-                # 파일 경로인 경우
-                model_file = self.model_path
-            else:
-                # 디렉토리 경로인 경우 모델 파일 찾기
-                possible_files = [
-                    os.path.join(self.model_path, 'best_model.pth'),
-                    os.path.join(self.model_path, self.diagnosis_type),  # step1 또는 step2
-                    os.path.join(self.model_path, 'model.pth')
-                ]
-                
-                model_file = None
-                for file_path in possible_files:
-                    if os.path.exists(file_path):
-                        model_file = file_path
-                        break
-                
-                if model_file is None:
-                    raise FileNotFoundError(f"Model file not found in {self.model_path}")
-            
-            logger.info(f"Loading model from: {model_file}")
-            
-            # 파일 크기 확인
-            file_size = os.path.getsize(model_file) / (1024 * 1024)  # MB
-            logger.info(f"Model file size: {file_size:.2f} MB")
-            
-            # 모델 로드
-            checkpoint = torch.load(model_file, map_location=self.device)
-            
-            # checkpoint 정보 로깅
-            logger.info(f"Checkpoint type: {type(checkpoint)}")
-            if isinstance(checkpoint, dict):
-                logger.info(f"Checkpoint keys: {list(checkpoint.keys())}")
-                
-                # 훈련 정보가 있다면 출력
-                if 'epoch' in checkpoint:
-                    logger.info(f"Model epoch: {checkpoint['epoch']}")
-                if 'best_acc' in checkpoint:
-                    logger.info(f"Best accuracy: {checkpoint['best_acc']}")
-                if 'loss' in checkpoint:
-                    logger.info(f"Loss: {checkpoint['loss']}")
-            
-            # checkpoint가 dict인 경우 (state_dict가 포함된 경우)
-            if isinstance(checkpoint, dict):
-                if 'model_state_dict' in checkpoint:
-                    state_dict = checkpoint['model_state_dict']
-                elif 'state_dict' in checkpoint:
-                    state_dict = checkpoint['state_dict']
-                else:
-                    state_dict = checkpoint
-            else:
-                # checkpoint가 직접 state_dict인 경우
-                state_dict = checkpoint
-            
-            # state_dict 정보 로깅
-            logger.info(f"State dict keys count: {len(state_dict.keys())}")
-            logger.info(f"First few keys: {list(state_dict.keys())[:5]}")
-            
-            # DataParallel로 저장된 모델인 경우 처리
-            if list(state_dict.keys())[0].startswith('module.'):
-                logger.info("Removing 'module.' prefix from DataParallel model")
-                # DataParallel로 저장된 모델의 키에서 'module.' 제거
-                new_state_dict = {}
-                for key, value in state_dict.items():
-                    new_key = key.replace('module.', '')
-                    new_state_dict[new_key] = value
-                state_dict = new_state_dict
-            
-            model.load_state_dict(state_dict)
-            model = model.to(self.device)
-            model.eval()
-            
-            # 모델 파라미터 수 확인
-            total_params = sum(p.numel() for p in model.parameters())
-            logger.info(f"Total model parameters: {total_params:,}")
-            
-            self.model = model
-            logger.info(f"Model loaded successfully on device: {self.device}")
+            self.model = torch.jit.load(mobile_path, map_location=self.device)
+            self.model.eval()
+            logger.info(f"PyTorch Mobile model loaded: {self.diagnosis_type}")
             
         except Exception as e:
-            logger.error(f"Failed to load model: {str(e)}")
-            raise Exception(f"Model loading failed: {str(e)}")
+            error_msg = f"Failed to load PyTorch Mobile model: {str(e)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
     
     def preprocess_image(self, image):
         """이미지를 모델 입력 형태로 전처리합니다."""
-        try:
-            # PIL Image로 변환 (이미 PIL Image인 경우 그대로 사용)
-            if not isinstance(image, Image.Image):
-                image = Image.fromarray(image)
-            
-            # RGB로 변환 (RGBA나 다른 모드인 경우)
-            if image.mode != 'RGB':
-                image = image.convert('RGB')
-            
-            # 전처리 적용
-            tensor = self.transform(image)
-            
-            # 배치 차원 추가
-            tensor = tensor.unsqueeze(0)
-            
-            return tensor.to(self.device)
-            
-        except Exception as e:
-            logger.error(f"Image preprocessing failed: {str(e)}")
-            raise Exception(f"Image preprocessing failed: {str(e)}")
+        if not isinstance(image, Image.Image):
+            image = Image.fromarray(image)
+        
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        tensor = self.transform(image).unsqueeze(0).to(self.device)
+        return tensor
     
     def predict(self, image):
         """이미지에 대해 질병 여부를 예측합니다."""
+        if self.model is None:
+            raise Exception("PyTorch Mobile model not loaded")
+        
+        # 이미지 전처리
+        input_tensor = self.preprocess_image(image)
+        
+        # 추론 실행
+        with torch.no_grad():
+            outputs = self.model(input_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            predicted_class = torch.argmax(probabilities, dim=1).item()
+            confidence = probabilities[0][predicted_class].item()
+        
+        # 모델 타입에 따라 결과 해석
+        if self.diagnosis_type == "step1":
+            is_normal = (predicted_class == 1)  # 0: abnormal, 1: normal
+            result = {
+                'is_normal': is_normal,
+                'confidence': float(confidence),
+                'predicted_class': self.class_names[predicted_class],
+                'predicted_class_index': predicted_class,
+                'probabilities': {
+                    'normal': float(probabilities[0][1]),
+                    'abnormal': float(probabilities[0][0])
+                },
+                'model_type': 'PyTorch Mobile'
+            }
+        elif self.diagnosis_type == "step2":
+            category = self.class_names[predicted_class]
+            result = {
+                'category': category,
+                'confidence': float(confidence),
+                'predicted_class': self.class_names[predicted_class],
+                'predicted_class_index': predicted_class,
+                'probabilities': {
+                    'corneal': float(probabilities[0][0]),
+                    'inflammation': float(probabilities[0][1])
+                },
+                'model_type': 'PyTorch Mobile'
+            }
+        else:
+            result = {
+                'predicted_class': self.class_names[predicted_class],
+                'confidence': float(confidence),
+                'predicted_class_index': predicted_class,
+                'model_type': 'PyTorch Mobile'
+            }
+        
+        return result
+    
+    def is_model_loaded(self):
+        """모델이 로드되었는지 확인합니다."""
+        return self.model is not None
+    
+    def get_model_info(self):
+        """모델 정보를 반환합니다."""
+        return {
+            'model_type': 'PyTorch Mobile',
+            'diagnosis_type': self.diagnosis_type,
+            'class_names': self.class_names,
+            'device': str(self.device),
+            'model_loaded': self.is_model_loaded(),
+            'model_path': self._get_mobile_model_path()
+        }
+
+
+class MobileModelConverter:
+    """기존 PyTorch 모델을 PyTorch Mobile로 변환하는 유틸리티"""
+    
+    @staticmethod
+    def convert_to_mobile(original_model_path, mobile_model_path, model_type="step1"):
+        """
+        기존 모델을 PyTorch Mobile 형식으로 변환
+        
+        Args:
+            original_model_path: 원본 모델 경로
+            mobile_model_path: 변환된 모바일 모델 저장 경로
+            model_type: 모델 타입 ("step1" 또는 "step2")
+        """
         try:
-            if self.model is None:
-                raise Exception("Model not loaded")
+            logger.info(f"Converting {original_model_path} to mobile format...")
             
-            # 이미지 전처리
-            input_tensor = self.preprocess_image(image)
+            # 모바일 모델 생성
+            mobile_model = DiagnosisModel(
+                model_path=original_model_path,
+                model_type=model_type,
+                use_mobile=True
+            )
             
-            # 추론 실행
-            with torch.no_grad():
-                outputs = self.model(input_tensor)
-                probabilities = torch.nn.functional.softmax(outputs, dim=1)
-                predicted_class = torch.argmax(probabilities, dim=1).item()
-                confidence = probabilities[0][predicted_class].item()
+            # 모바일 모델 저장
+            mobile_model.save_mobile_model(mobile_model_path)
             
-            # 원시 출력값도 로깅
-            logger.info(f"Raw model outputs: {outputs[0].tolist()}")
-            logger.info(f"Softmax probabilities: {probabilities[0].tolist()}")
-            logger.info(f"Predicted class index: {predicted_class}")
-            logger.info(f"Class names mapping: {dict(enumerate(self.class_names))}")
+            logger.info(f"Conversion completed: {mobile_model_path}")
             
-            # 모델 타입에 따라 결과 해석
-            if self.diagnosis_type == "step1":
-                # Step1: 정상/비정상 분류
-                is_normal = (predicted_class == 1)  # 0: abnormal, 1: normal
-                result = {
-                    'is_normal': is_normal,
-                    'confidence': float(confidence),
-                    'predicted_class': self.class_names[predicted_class],
-                    'predicted_class_index': predicted_class,
-                    'probabilities': {
-                        'normal': float(probabilities[0][1]),      # 인덱스 1이 normal
-                        'abnormal': float(probabilities[0][0])     # 인덱스 0이 abnormal
-                    },
-                    'raw_outputs': outputs[0].tolist()  # 디버깅용
-                }
-            elif self.diagnosis_type == "step2":
-                # Step2: 질병 카테고리 분류
-                category = self.class_names[predicted_class]  # corneal 또는 inflammation
-                result = {
-                    'category': category,
-                    'confidence': float(confidence),
-                    'predicted_class': self.class_names[predicted_class],
-                    'predicted_class_index': predicted_class,
-                    'probabilities': {
-                        'corneal': float(probabilities[0][0]),        # 인덱스 0이 corneal
-                        'inflammation': float(probabilities[0][1])    # 인덱스 1이 inflammation
-                    },
-                    'raw_outputs': outputs[0].tolist()  # 디버깅용
-                }
-            else:
-                # 기본 결과
-                result = {
-                    'predicted_class': self.class_names[predicted_class],
-                    'confidence': float(confidence),
-                    'predicted_class_index': predicted_class,
-                    'raw_outputs': outputs[0].tolist()
-                }
-            
-            logger.info(f"Prediction result: {result}")
-            return result
+            return mobile_model_path
             
         except Exception as e:
-            logger.error(f"Prediction failed: {str(e)}")
-            raise Exception(f"Prediction failed: {str(e)}")
+            logger.error(f"Model conversion failed: {str(e)}")
+            raise Exception(f"Model conversion failed: {str(e)}")
+    
+    @staticmethod
+    def compare_model_sizes(original_path, mobile_path):
+        """원본 모델과 모바일 모델의 크기 비교"""
+        try:
+            original_size = os.path.getsize(original_path) / (1024 * 1024)
+            mobile_size = os.path.getsize(mobile_path) / (1024 * 1024)
+            
+            reduction_percent = ((original_size - mobile_size) / original_size) * 100
+            
+            comparison = {
+                'original_size_mb': round(original_size, 2),
+                'mobile_size_mb': round(mobile_size, 2),
+                'size_reduction_percent': round(reduction_percent, 1),
+                'size_reduction_mb': round(original_size - mobile_size, 2)
+            }
+            
+            logger.debug(f"Model size comparison: {comparison}")
+            return comparison
+            
+        except Exception as e:
+            logger.error(f"Size comparison failed: {str(e)}")
+            return None
+
+
+# 경량화된 모바일 전용 클래스 (기존 LiteMobileDiagnosisModel과 호환)
+class LiteMobileDiagnosisModel:
+    """최소 의존성으로 구현된 PyTorch Mobile 모델"""
+    
+    def __init__(self, mobile_model_path, class_names):
+        """
+        Args:
+            mobile_model_path: .ptl 모바일 모델 파일 경로
+            class_names: 클래스 이름 리스트
+        """
+        self.model = torch.jit.load(mobile_model_path)
+        self.model.eval()
+        self.class_names = class_names
+        self.img_size = 224
+        self.model_type = 'PyTorch Mobile Lite'
+        
+        # 전처리 파라미터
+        self.mean = torch.tensor([0.485, 0.456, 0.406])
+        self.std = torch.tensor([0.229, 0.224, 0.225])
+    
+    def preprocess_image(self, image):
+        """최소한의 이미지 전처리"""
+        if not isinstance(image, Image.Image):
+            image = Image.fromarray(image)
+        
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # PIL을 사용한 리사이즈
+        image = image.resize((self.img_size, self.img_size))
+        
+        # 텐서로 변환
+        tensor = transforms.ToTensor()(image)
+        
+        # 정규화
+        tensor = transforms.Normalize(self.mean, self.std)(tensor)
+        
+        # 배치 차원 추가
+        tensor = tensor.unsqueeze(0)
+        
+        return tensor
+    
+    def predict(self, image):
+        """경량화된 모바일 추론"""
+        input_tensor = self.preprocess_image(image)
+        
+        with torch.no_grad():
+            outputs = self.model(input_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            predicted_class = torch.argmax(probabilities, dim=1).item()
+            confidence = probabilities[0][predicted_class].item()
+        
+        return {
+            'predicted_class': self.class_names[predicted_class],
+            'confidence': float(confidence),
+            'predicted_class_index': int(predicted_class),
+            'probabilities': {name: float(prob) for name, prob in zip(self.class_names, probabilities[0])},
+            'model_type': self.model_type
+        }
     
     def is_model_loaded(self):
         """모델이 로드되었는지 확인합니다."""
         return self.model is not None 
-
- 
