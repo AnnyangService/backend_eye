@@ -3,6 +3,7 @@ import urllib.parse
 import logging
 import requests
 import threading
+import torch
 from PIL import Image
 from flask import current_app
 from .ai_model import DiagnosisModel
@@ -46,37 +47,126 @@ class DiagnosisService:
             logger.info("AI 모델 초기화 시작...")
             
             step1_model_path = self._get_model_path('step1')
+            logger.info(f"Step1 모델 경로: {step1_model_path}")
             self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1")
             
+            # Step1 모델 동적 양자화 적용 (항상 시도)
+            if self.step1_model.is_model_loaded():
+                self._apply_dynamic_quantization(self.step1_model, "Step1")
+            
+            logger.info("Step1 모델 로드 완료")
+            
             step2_model_path = self._get_model_path('step2')
+            logger.info(f"Step2 모델 경로: {step2_model_path}")
             self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2")
             
+            # Step2 모델 동적 양자화 적용 (항상 시도)
+            if self.step2_model.is_model_loaded():
+                self._apply_dynamic_quantization(self.step2_model, "Step2")
+            
+            logger.info("Step2 모델 로드 완료")
             logger.info("AI 모델 초기화 완료")
             
         except Exception as e:
             logger.error(f"AI 모델 초기화 실패: {str(e)}")
+            import traceback
+            logger.error(f"상세 에러: {traceback.format_exc()}")
             # 모델 로드 실패 시 None으로 설정
             self.step1_model = None
             self.step2_model = None
             # 에러를 다시 발생시켜서 서비스 초기화 시점에 문제를 알림
             raise Exception(f"AI 모델 로드 실패: {str(e)}")
     
+    def _apply_dynamic_quantization(self, model_wrapper, model_name):
+        """
+        모델에 동적 양자화를 적용합니다. 실패 시 원본 모델을 유지합니다.
+        
+        Args:
+            model_wrapper: DiagnosisModel 인스턴스
+            model_name: 모델 이름 (로깅용)
+        """
+        try:
+            logger.info(f"{model_name} 동적 양자화 시작...")
+            
+            # 양자화 전 모델 크기 측정
+            original_size = self._get_model_size(model_wrapper.model)
+            
+            # 동적 양자화 적용
+            quantized_model = torch.quantization.quantize_dynamic(
+                model_wrapper.model,
+                {torch.nn.Linear, torch.nn.Conv2d},  # 양자화할 레이어 타입
+                dtype=torch.qint8  # 8비트 정수로 양자화
+            )
+            
+            # 양자화된 모델로 교체
+            model_wrapper.model = quantized_model
+            
+            # 양자화 후 모델 크기 측정
+            quantized_size = self._get_model_size(quantized_model)
+            
+            # 크기 감소 비율 계산
+            size_reduction = ((original_size - quantized_size) / original_size) * 100
+            
+            logger.info(f"{model_name} 동적 양자화 완료:")
+            logger.info(f"  - 원본 크기: {original_size:.2f} MB")
+            logger.info(f"  - 양자화 후 크기: {quantized_size:.2f} MB")
+            logger.info(f"  - 크기 감소: {size_reduction:.1f}%")
+            
+        except Exception as e:
+            logger.warning(f"{model_name} 동적 양자화 실패 (원본 모델 유지): {str(e)}")
+            # 양자화 실패 시 원본 모델을 그대로 사용
+    
+    def _get_model_size(self, model):
+        """
+        모델의 메모리 크기를 MB 단위로 계산합니다.
+        
+        Args:
+            model: PyTorch 모델
+            
+        Returns:
+            float: 모델 크기 (MB)
+        """
+        param_size = 0
+        buffer_size = 0
+        
+        for param in model.parameters():
+            param_size += param.nelement() * param.element_size()
+        
+        for buffer in model.buffers():
+            buffer_size += buffer.nelement() * buffer.element_size()
+        
+        size_mb = (param_size + buffer_size) / 1024 / 1024
+        return size_mb
+    
     def get_model_info(self):
         """현재 로드된 모델 정보를 반환합니다."""
         info = {
-            "step1_model_loaded": self.step1_model is not None,
-            "step2_model_loaded": self.step2_model is not None,
-            "step1_model_info": None,
-            "step2_model_info": None
+            "service_info": {
+                "step1_model_loaded": self.step1_model is not None,
+                "step2_model_loaded": self.step2_model is not None,
+                "quantization_attempted": True,  # 항상 양자화 시도
+                "images_directory": self.images_dir
+            }
         }
         
         if self.step1_model is not None:
-            info["step1_model_info"] = self.step1_model.get_model_info()
+            step1_info = self.step1_model.get_model_info()
+            step1_info["quantized"] = self._is_model_quantized(self.step1_model.model)
+            info["step1_model"] = step1_info
         
         if self.step2_model is not None:
-            info["step2_model_info"] = self.step2_model.get_model_info()
+            step2_info = self.step2_model.get_model_info()
+            step2_info["quantized"] = self._is_model_quantized(self.step2_model.model)
+            info["step2_model"] = step2_info
         
         return info
+    
+    def _is_model_quantized(self, model):
+        """모델이 양자화되었는지 확인합니다."""
+        for module in model.modules():
+            if hasattr(module, '_packed_params') or 'quantized' in str(type(module)).lower():
+                return True
+        return False
     
     def _download_image(self, image_url):
         """
