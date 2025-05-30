@@ -46,10 +46,10 @@ class DiagnosisService:
             logger.info("AI 모델 초기화 시작...")
             
             step1_model_path = self._get_model_path('step1')
-            self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1", use_mobile=True)
+            self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1")
             
             step2_model_path = self._get_model_path('step2')
-            self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2", use_mobile=True)
+            self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2")
             
             logger.info("AI 모델 초기화 완료")
             

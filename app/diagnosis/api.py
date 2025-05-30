@@ -50,7 +50,7 @@ try:
     
     # 모델 정보 출력
     model_info = diagnosis_service.get_model_info()
-    print(f"📱 AI Model Information:")
+    print(f"🤖 AI Model Information:")
     if model_info['step1_model_info']:
         step1_info = model_info['step1_model_info']
         print(f"   Step1: {step1_info['model_type']} ({'✅ Loaded' if step1_info['model_loaded'] else '❌ Failed'})")
@@ -67,7 +67,6 @@ except Exception as e:
     logger.error(f"DiagnosisService 초기화 실패: {str(e)}")
     logger.error(f"상세 에러: {traceback.format_exc()}")
     print(f"❌ DiagnosisService 초기화 실패: {str(e)}")
-    print(f"💡 AI 모델이 없다면 convert_to_mobile.py를 먼저 실행하세요.")
 
 @diagnosis_ns.route('/info/')
 class DiagnosisInfoResource(Resource):
@@ -105,13 +104,9 @@ class DiagnosisInfoResource(Resource):
 class DiagnosisStep1Resource(Resource):
     @diagnosis_ns.doc('질병여부판단')
     @diagnosis_ns.expect(step1_request_model, validate=True)
-    # @diagnosis_ns.marshal_with(step1_response_model, code=200)
-    # @diagnosis_ns.marshal_with(error_response_model, code=400)
-    # @diagnosis_ns.marshal_with(error_response_model, code=500)
-    # @diagnosis_ns.marshal_with(error_response_model, code=503)
     def post(self):
         """
-        질병분석 Step1 - 질병여부판단 (PyTorch Mobile)
+        질병분석 Step1 - 질병여부판단
         
         이미지를 분석하여 질병 여부를 판단합니다.
         """
@@ -150,7 +145,6 @@ class DiagnosisStep1Resource(Resource):
             # Step1 진단 처리
             result = diagnosis_service.process_step1_diagnosis(image_url)
             
-            # 디버깅 로그 제거 - 서비스에서 이미 로깅됨
             response_data = {
                 'success': True,
                 'message': 'Success',
@@ -184,7 +178,7 @@ class DiagnosisStep2Resource(Resource):
     @diagnosis_ns.expect(step2_request_model, validate=True)
     def post(self):
         """
-        질병분석 Step2 (PyTorch Mobile)
+        질병분석 Step2
         
         Step2 진단을 위한 요청을 처리합니다.
         """
