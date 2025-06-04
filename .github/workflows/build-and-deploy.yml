@@ -26,29 +26,8 @@ jobs:
       - name: Get Parameters from SSM
         id: get-ssm-params
         run: |
-            DB_URL=$(aws ssm get-parameter --name "/annyang/db/url" --with-decryption --query "Parameter.Value" --output text)
-            DB_USERNAME=$(aws ssm get-parameter --name "/annyang/db/username" --with-decryption --query "Parameter.Value" --output text)
-            DB_PASSWORD=$(aws ssm get-parameter --name "/annyang/db/password" --with-decryption --query "Parameter.Value" --output text)
-            
-            # CodeDeploy 관련 파라미터 가져오기
-            CODEDEPLOY_APP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/app_name" --query "Parameter.Value" --output text)
-            CODEDEPLOY_GROUP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/group_name" --query "Parameter.Value" --output text)
             CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
-            
-            # AI 서버 URL 가져오기
-            AI_SERVER_URL=$(aws ssm get-parameter --name "/annyang/ai-server/url" --query "Parameter.Value" --output text)
-            
-            echo "DB_URL=$DB_URL" >> $GITHUB_ENV
-            echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_ENV
-            echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
-            
-            # CodeDeploy 파라미터를 환경 변수로 저장
-            echo "CODEDEPLOY_APP_NAME=$CODEDEPLOY_APP_NAME" >> $GITHUB_ENV
-            echo "CODEDEPLOY_GROUP_NAME=$CODEDEPLOY_GROUP_NAME" >> $GITHUB_ENV
             echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
-
-            # AI 서버 URL을 환경 변수로 저장
-            echo "AI_SERVER_URL=$AI_SERVER_URL" >> $GITHUB_ENV
             
       - name: Fetch files from S3
         run: |
