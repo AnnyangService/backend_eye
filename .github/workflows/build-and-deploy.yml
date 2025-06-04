@@ -9,6 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write   # OIDC에 필요한 권한
+      contents: read    # 코드 체크아웃에 필요한 권한
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,7 +34,7 @@ jobs:
             CODEDEPLOY_APP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/app_name" --query "Parameter.Value" --output text)
             CODEDEPLOY_GROUP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/group_name" --query "Parameter.Value" --output text)
             CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
-
+ro
             # AI 서버 URL 가져오기
             AI_SERVER_URL=$(aws ssm get-parameter --name "/annyang/ai-server/url" --query "Parameter.Value" --output text)
             
