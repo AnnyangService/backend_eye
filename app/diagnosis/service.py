@@ -505,3 +505,36 @@ class DiagnosisService:
         except Exception as e:
             logger.error(f"에러 콜백 전송 중 오류: {str(e)}")
 
+    def process_step3_diagnosis(self, second_step_result, attributes):
+        """
+        Step3 진단 처리 - 세부 진단
+        
+        Args:
+            second_step_result (str): 2단계 진단 결과 ("inflammation" 또는 "corneal")
+            attributes (list): 진단 속성 리스트
+            
+        Returns:
+            dict: 진단 결과 {"category": str, "description": str}
+        """
+        try:
+            logger.info(f"Step3 진단 시작 - 2단계 결과: {second_step_result}")
+            logger.info(f"속성 개수: {len(attributes)}")
+            
+            # TODO: 실제 Step3 진단 로직 구현
+            # 현재는 임시 응답 반환
+            
+            # 임시 진단 결과 (실제 구현 시 삭제 예정)
+            mock_result = {
+                "category": "keratitis",
+                "description": "LLM이 생성한 진단 결과"
+            }
+            
+            logger.info(f"Step3 진단 완료 - 결과: {mock_result}")
+            return mock_result
+            
+        except Exception as e:
+            logger.error(f"Step3 진단 처리 중 오류 발생: {str(e)}")
+            import traceback
+            logger.error(f"상세 에러: {traceback.format_exc()}")
+            raise Exception(f"Step3 진단 처리 실패: {str(e)}")
+

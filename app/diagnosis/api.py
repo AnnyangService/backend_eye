@@ -36,6 +36,31 @@ step2_response_model = diagnosis_ns.model('Step2Response', {
     'data': fields.Raw(description='항상 null (비동기 처리로 인해 즉시 응답)')
 })
 
+# Define request model for Step3
+step3_attribute_model = diagnosis_ns.model('Step3Attribute', {
+    'id': fields.Integer(required=True, description='룰 ID'),
+    'description': fields.String(required=True, description='속성 설명')
+})
+
+step3_request_model = diagnosis_ns.model('Step3Request', {
+    'secondStepDiagnosisResult': fields.String(required=True, description='2단계 진단 결과 (inflammation 또는 corneal)', 
+                                              enum=['inflammation', 'corneal']),
+    'attributes': fields.List(fields.Nested(step3_attribute_model), required=True, 
+                             description='진단 속성 리스트')
+})
+
+# Define response model for Step3
+step3_data_model = diagnosis_ns.model('Step3Data', {
+    'category': fields.String(required=True, description='진단 카테고리'),
+    'description': fields.String(required=True, description='LLM이 생성한 진단 결과')
+})
+
+step3_response_model = diagnosis_ns.model('Step3Response', {
+    'success': fields.Boolean(required=True, description='요청 성공 여부'),
+    'message': fields.String(required=True, description='응답 메시지'),
+    'data': fields.Nested(step3_data_model, required=True, description='진단 결과 데이터')
+})
+
 error_response_model = diagnosis_ns.model('ErrorResponse', {
     'success': fields.Boolean(description='요청 성공 여부'),
     'error_code': fields.String(description='에러 코드'),
@@ -227,6 +252,109 @@ class DiagnosisStep2Resource(Resource):
             
         except Exception as e:
             error_message = str(e)
+            
+            return {
+                'success': False,
+                'error_code': 'INTERNAL_ERROR',
+                'message': error_message,
+                'details': {'error': error_message}
+            }, 500 
+
+@diagnosis_ns.route('/step3/')
+class DiagnosisStep3Resource(Resource):
+    @diagnosis_ns.doc('질병분석 Step3')
+    @diagnosis_ns.expect(step3_request_model, validate=True)
+    @diagnosis_ns.marshal_with(step3_response_model, code=200)
+    @diagnosis_ns.marshal_with(error_response_model, code=400)
+    @diagnosis_ns.marshal_with(error_response_model, code=500)
+    @diagnosis_ns.marshal_with(error_response_model, code=503)
+    def post(self):
+        """
+        질병분석 Step3 - 세부 진단
+        
+        2단계 진단 결과와 속성 정보를 기반으로 세부 진단을 수행합니다.
+        """
+        try:
+            # 서비스 초기화 확인
+            if diagnosis_service is None:
+                return {
+                    'success': False,
+                    'error_code': 'SERVICE_UNAVAILABLE',
+                    'message': 'AI 모델 서비스를 사용할 수 없습니다.',
+                    'details': {'service': 'AI model not loaded'}
+                }, 503
+            
+            # Flask-RESTX가 자동으로 검증한 데이터 가져오기
+            data = request.get_json()
+            
+            if not data:
+                return {
+                    'success': False,
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': 'Request body is required',
+                    'details': {'body': 'Request body is required'}
+                }, 400
+            
+            # 필수 필드 검증
+            second_step_result = data.get('secondStepDiagnosisResult')
+            attributes = data.get('attributes')
+            
+            if not second_step_result:
+                return {
+                    'success': False,
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': 'secondStepDiagnosisResult is required',
+                    'details': {'secondStepDiagnosisResult': 'This field is required'}
+                }, 400
+            
+            if not attributes or not isinstance(attributes, list):
+                return {
+                    'success': False,
+                    'error_code': 'VALIDATION_ERROR',
+                    'message': 'attributes is required and must be a list',
+                    'details': {'attributes': 'This field is required and must be a list'}
+                }, 400
+            
+            # attributes 유효성 검증
+            for i, attr in enumerate(attributes):
+                if not isinstance(attr, dict):
+                    return {
+                        'success': False,
+                        'error_code': 'VALIDATION_ERROR',
+                        'message': f'attributes[{i}] must be an object',
+                        'details': {'attributes': f'Item at index {i} must be an object'}
+                    }, 400
+                
+                if 'id' not in attr or 'description' not in attr:
+                    return {
+                        'success': False,
+                        'error_code': 'VALIDATION_ERROR',
+                        'message': f'attributes[{i}] must have id and description fields',
+                        'details': {'attributes': f'Item at index {i} must have id and description fields'}
+                    }, 400
+            
+            # Step3 진단 처리
+            result = diagnosis_service.process_step3_diagnosis(second_step_result, attributes)
+            
+            response_data = {
+                'success': True,
+                'message': 'Success',
+                'data': result
+            }
+            
+            return response_data, 200
+            
+        except Exception as e:
+            error_message = str(e)
+            
+            # AI 모델 관련 에러인지 확인
+            if "AI 모델이 로드되지 않았습니다" in error_message:
+                return {
+                    'success': False,
+                    'error_code': 'MODEL_NOT_AVAILABLE',
+                    'message': error_message,
+                    'details': {'model': 'AI model not loaded or failed to initialize'}
+                }, 503
             
             return {
                 'success': False,

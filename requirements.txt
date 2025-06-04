@@ -28,3 +28,5 @@ torch>=2.0.0
 torchvision>=0.15.0
 efficientnet-pytorch==0.7.1
 numpy>=1.21.0,<2.0.0
+transformers>=4.21.0
+tokenizers>=0.13.0
