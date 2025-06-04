@@ -20,8 +20,8 @@ class Config:
     STEP2_MODEL_PATH = os.environ.get('STEP2_MODEL_PATH') or 'app/diagnosis/models/step2'
     
     # API 서버 설정 (Step2 결과 콜백용)
-    API_SERVER_URL = os.environ.get('API_SERVER_URL') or 'http://localhost:8080'
-    API_SERVER_CALLBACK_ENDPOINT = os.environ.get('API_SERVER_CALLBACK_ENDPOINT') or '/diagnosis/step2/callback'
+    API_SERVER_URL = os.environ.get('API_SERVER_URL') or 'http://host.docker.internal:8080'
+    API_SERVER_CALLBACK_ENDPOINT = os.environ.get('API_SERVER_CALLBACK_ENDPOINT') or '/diagnosis/step2'
     
     # 이미지 처리 설정
     MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', '4096'))
@@ -38,7 +38,7 @@ class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True
     SQLALCHEMY_ECHO = True  # SQL 쿼리 로깅
-    API_SERVER_URL = os.environ.get('DEV_API_SERVER_URL') or 'http://localhost:8080'
+    API_SERVER_URL = os.environ.get('DEV_API_SERVER_URL') or 'http://host.docker.internal:8080'
 
 class TestingConfig(Config):
     """Testing configuration"""
