@@ -51,12 +51,12 @@ try:
     # 모델 정보 출력
     model_info = diagnosis_service.get_model_info()
     print(f"🤖 AI Model Information:")
-    if model_info['step1_model_info']:
-        step1_info = model_info['step1_model_info']
-        print(f"   Step1: {step1_info['model_type']} ({'✅ Loaded' if step1_info['model_loaded'] else '❌ Failed'})")
-    if model_info['step2_model_info']:
-        step2_info = model_info['step2_model_info']
-        print(f"   Step2: {step2_info['model_type']} ({'✅ Loaded' if step2_info['model_loaded'] else '❌ Failed'})")
+    if model_info.get('step1_model'):
+        step1_info = model_info['step1_model']
+        print(f"   Step1: {step1_info['model_architecture']} ({'✅ Loaded' if step1_info['model_loaded'] else '❌ Failed'})")
+    if model_info.get('step2_model'):
+        step2_info = model_info['step2_model']
+        print(f"   Step2: {step2_info['model_architecture']} ({'✅ Loaded' if step2_info['model_loaded'] else '❌ Failed'})")
         
 except Exception as e:
     # AI 모델 로드 실패 시 서비스 객체를 None으로 설정
