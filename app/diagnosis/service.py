@@ -42,27 +42,91 @@ class DiagnosisService:
         return model_path
 
     def _initialize_model(self):
-        """AI 모델을 초기화합니다."""
+        """AI 모델을 초기화하고 동적 양자화를 적용합니다."""
         try:
             logger.info("AI 모델 초기화 시작...")
             
+            # Step1 모델 로드
             step1_model_path = self._get_model_path('step1')
             logger.info(f"Step1 모델 경로: {step1_model_path}")
             self.step1_model = DiagnosisModel(model_path=step1_model_path, model_type="step1")
             
-            # Step1 모델 동적 양자화 적용 (항상 시도)
+            # Step1 모델 동적 양자화 적용
             if self.step1_model.is_model_loaded():
-                self._apply_dynamic_quantization(self.step1_model, "Step1")
+                try:
+                    logger.info("Step1 동적 양자화 시작...")
+                    
+                    # 양자화 전 모델 크기 측정
+                    param_size = sum(p.nelement() * p.element_size() for p in self.step1_model.model.parameters())
+                    buffer_size = sum(b.nelement() * b.element_size() for b in self.step1_model.model.buffers())
+                    original_size = (param_size + buffer_size) / 1024 / 1024
+                    
+                    # 동적 양자화 적용
+                    quantized_model = torch.quantization.quantize_dynamic(
+                        self.step1_model.model,
+                        {torch.nn.Linear, torch.nn.Conv2d},
+                        dtype=torch.qint8
+                    )
+                    
+                    # 양자화된 모델로 교체
+                    self.step1_model.model = quantized_model
+                    
+                    # 양자화 후 모델 크기 측정
+                    param_size = sum(p.nelement() * p.element_size() for p in quantized_model.parameters())
+                    buffer_size = sum(b.nelement() * b.element_size() for b in quantized_model.buffers())
+                    quantized_size = (param_size + buffer_size) / 1024 / 1024
+                    
+                    size_reduction = ((original_size - quantized_size) / original_size) * 100
+                    
+                    logger.info(f"Step1 동적 양자화 완료:")
+                    logger.info(f"  - 원본 크기: {original_size:.2f} MB")
+                    logger.info(f"  - 양자화 후 크기: {quantized_size:.2f} MB")
+                    logger.info(f"  - 크기 감소: {size_reduction:.1f}%")
+                    
+                except Exception as e:
+                    logger.warning(f"Step1 동적 양자화 실패 (원본 모델 유지): {str(e)}")
             
             logger.info("Step1 모델 로드 완료")
             
+            # Step2 모델 로드
             step2_model_path = self._get_model_path('step2')
             logger.info(f"Step2 모델 경로: {step2_model_path}")
             self.step2_model = DiagnosisModel(model_path=step2_model_path, model_type="step2")
             
-            # Step2 모델 동적 양자화 적용 (항상 시도)
+            # Step2 모델 동적 양자화 적용
             if self.step2_model.is_model_loaded():
-                self._apply_dynamic_quantization(self.step2_model, "Step2")
+                try:
+                    logger.info("Step2 동적 양자화 시작...")
+                    
+                    # 양자화 전 모델 크기 측정
+                    param_size = sum(p.nelement() * p.element_size() for p in self.step2_model.model.parameters())
+                    buffer_size = sum(b.nelement() * b.element_size() for b in self.step2_model.model.buffers())
+                    original_size = (param_size + buffer_size) / 1024 / 1024
+                    
+                    # 동적 양자화 적용
+                    quantized_model = torch.quantization.quantize_dynamic(
+                        self.step2_model.model,
+                        {torch.nn.Linear, torch.nn.Conv2d},
+                        dtype=torch.qint8
+                    )
+                    
+                    # 양자화된 모델로 교체
+                    self.step2_model.model = quantized_model
+                    
+                    # 양자화 후 모델 크기 측정
+                    param_size = sum(p.nelement() * p.element_size() for p in quantized_model.parameters())
+                    buffer_size = sum(b.nelement() * b.element_size() for b in quantized_model.buffers())
+                    quantized_size = (param_size + buffer_size) / 1024 / 1024
+                    
+                    size_reduction = ((original_size - quantized_size) / original_size) * 100
+                    
+                    logger.info(f"Step2 동적 양자화 완료:")
+                    logger.info(f"  - 원본 크기: {original_size:.2f} MB")
+                    logger.info(f"  - 양자화 후 크기: {quantized_size:.2f} MB")
+                    logger.info(f"  - 크기 감소: {size_reduction:.1f}%")
+                    
+                except Exception as e:
+                    logger.warning(f"Step2 동적 양자화 실패 (원본 모델 유지): {str(e)}")
             
             logger.info("Step2 모델 로드 완료")
             logger.info("AI 모델 초기화 완료")
@@ -77,96 +141,35 @@ class DiagnosisService:
             # 에러를 다시 발생시켜서 서비스 초기화 시점에 문제를 알림
             raise Exception(f"AI 모델 로드 실패: {str(e)}")
     
-    def _apply_dynamic_quantization(self, model_wrapper, model_name):
-        """
-        모델에 동적 양자화를 적용합니다. 실패 시 원본 모델을 유지합니다.
-        
-        Args:
-            model_wrapper: DiagnosisModel 인스턴스
-            model_name: 모델 이름 (로깅용)
-        """
-        try:
-            logger.info(f"{model_name} 동적 양자화 시작...")
-            
-            # 양자화 전 모델 크기 측정
-            original_size = self._get_model_size(model_wrapper.model)
-            
-            # 동적 양자화 적용
-            quantized_model = torch.quantization.quantize_dynamic(
-                model_wrapper.model,
-                {torch.nn.Linear, torch.nn.Conv2d},  # 양자화할 레이어 타입
-                dtype=torch.qint8  # 8비트 정수로 양자화
-            )
-            
-            # 양자화된 모델로 교체
-            model_wrapper.model = quantized_model
-            
-            # 양자화 후 모델 크기 측정
-            quantized_size = self._get_model_size(quantized_model)
-            
-            # 크기 감소 비율 계산
-            size_reduction = ((original_size - quantized_size) / original_size) * 100
-            
-            logger.info(f"{model_name} 동적 양자화 완료:")
-            logger.info(f"  - 원본 크기: {original_size:.2f} MB")
-            logger.info(f"  - 양자화 후 크기: {quantized_size:.2f} MB")
-            logger.info(f"  - 크기 감소: {size_reduction:.1f}%")
-            
-        except Exception as e:
-            logger.warning(f"{model_name} 동적 양자화 실패 (원본 모델 유지): {str(e)}")
-            # 양자화 실패 시 원본 모델을 그대로 사용
-    
-    def _get_model_size(self, model):
-        """
-        모델의 메모리 크기를 MB 단위로 계산합니다.
-        
-        Args:
-            model: PyTorch 모델
-            
-        Returns:
-            float: 모델 크기 (MB)
-        """
-        param_size = 0
-        buffer_size = 0
-        
-        for param in model.parameters():
-            param_size += param.nelement() * param.element_size()
-        
-        for buffer in model.buffers():
-            buffer_size += buffer.nelement() * buffer.element_size()
-        
-        size_mb = (param_size + buffer_size) / 1024 / 1024
-        return size_mb
-    
     def get_model_info(self):
         """현재 로드된 모델 정보를 반환합니다."""
+        def _is_model_quantized(model):
+            """모델이 양자화되었는지 확인합니다."""
+            for module in model.modules():
+                if hasattr(module, '_packed_params') or 'quantized' in str(type(module)).lower():
+                    return True
+            return False
+        
         info = {
             "service_info": {
                 "step1_model_loaded": self.step1_model is not None,
                 "step2_model_loaded": self.step2_model is not None,
-                "quantization_attempted": True,  # 항상 양자화 시도
+                "quantization_attempted": True,
                 "images_directory": self.images_dir
             }
         }
         
         if self.step1_model is not None:
             step1_info = self.step1_model.get_model_info()
-            step1_info["quantized"] = self._is_model_quantized(self.step1_model.model)
+            step1_info["quantized"] = _is_model_quantized(self.step1_model.model)
             info["step1_model"] = step1_info
         
         if self.step2_model is not None:
             step2_info = self.step2_model.get_model_info()
-            step2_info["quantized"] = self._is_model_quantized(self.step2_model.model)
+            step2_info["quantized"] = _is_model_quantized(self.step2_model.model)
             info["step2_model"] = step2_info
         
         return info
-    
-    def _is_model_quantized(self, model):
-        """모델이 양자화되었는지 확인합니다."""
-        for module in model.modules():
-            if hasattr(module, '_packed_params') or 'quantized' in str(type(module)).lower():
-                return True
-        return False
     
     def _download_image(self, image_url):
         """
@@ -376,11 +379,106 @@ class DiagnosisService:
         # 현재 Flask 앱 인스턴스를 백그라운드 스레드로 전달
         app = current_app._get_current_object()
         
+        def _process_background():
+            """백그라운드에서 Step2 추론을 실행하고 결과를 API 서버로 전송합니다."""
+            # Flask 앱 컨텍스트 설정
+            with app.app_context():
+                try:
+                    logger.debug(f"Step2 백그라운드 추론 시작: ID={request_id}")
+                    
+                    # 1. 이미지 다운로드
+                    local_path = self._download_image(image_url)
+                    
+                    # 2. 이미지 로드 및 검증
+                    image = Image.open(local_path)
+                    self._validate_image(image)
+                    
+                    logger.debug(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
+                    
+                    # 3. AI 모델 분석
+                    if self.step2_model and self.step2_model.is_model_loaded():
+                        logger.debug(f"Step2 AI 모델 분석 시작: {local_path}")
+                        
+                        # 실제 AI 모델 추론
+                        prediction_result = self.step2_model.predict(image)
+                        
+                        # 4. API 서버로 성공 결과 전송
+                        callback_data = {
+                            "id": request_id,
+                            "password": password,
+                            "category": prediction_result['category'],
+                            "confidence": prediction_result['confidence'],
+                            "error": False,
+                            "message": None
+                        }
+                        
+                        _send_callback(app, callback_data)
+                        
+                        logger.info(f"Step2 백그라운드 처리 완료: ID={request_id}, 카테고리={prediction_result['category']}")
+                        
+                    else:
+                        # AI 모델이 로드되지 않은 경우
+                        error_msg = "Step2 AI 모델이 로드되지 않았습니다."
+                        logger.error(error_msg)
+                        
+                        # 에러를 API 서버로 전송
+                        _send_error_callback(app, request_id, password, error_msg)
+                        
+                except Exception as e:
+                    error_msg = f"Step2 백그라운드 처리 중 오류 발생: {str(e)}"
+                    logger.error(error_msg)
+                    
+                    # 에러를 API 서버로 전송
+                    _send_error_callback(app, request_id, password, error_msg)
+        
+        def _send_callback(app, callback_data):
+            """Step2 결과를 API 서버로 전송합니다."""
+            try:
+                # API 서버 URL 구성
+                api_server_url = app.config.get('API_SERVER_URL')
+                callback_endpoint = app.config.get('API_SERVER_CALLBACK_ENDPOINT')
+                
+                callback_url = f"{api_server_url}{callback_endpoint}"
+                
+                logger.debug(f"API 서버로 콜백 전송 시작: {callback_url}")
+                
+                # POST 요청 전송
+                timeout = app.config.get('IMAGE_DOWNLOAD_TIMEOUT', 30)
+                
+                response = requests.post(
+                    callback_url,
+                    json=callback_data,
+                    headers={'Content-Type': 'application/json'},
+                    timeout=timeout
+                )
+                response.raise_for_status()
+                
+                logger.info(f"API 서버 콜백 전송 성공: {response.status_code}")
+            except requests.RequestException as e:
+                logger.error(f"API 서버 콜백 전송 실패: {str(e)}")
+            except Exception as e:
+                logger.error(f"콜백 전송 중 예상치 못한 오류: {str(e)}")
+
+        def _send_error_callback(app, request_id, password, error_message):
+            """에러를 API 서버로 전송합니다."""
+            try:
+                callback_data = {
+                    "id": request_id,
+                    "password": password,
+                    "category": None,
+                    "confidence": None,
+                    "error": True,
+                    "message": error_message
+                }
+                
+                logger.debug(f"에러 콜백 전송: ID={request_id}, 에러={error_message}")
+                _send_callback(app, callback_data)
+                
+            except Exception as e:
+                logger.error(f"에러 콜백 전송 중 오류: {str(e)}")
+        
         # 백그라운드 스레드에서 실제 추론 실행
-        thread = threading.Thread(
-            target=self._process_step2_background,
-            args=(app, request_id, password, image_url)
-        )
+        thread = threading.Thread(target=_process_background)
         thread.daemon = True
         thread.start()
         
@@ -390,120 +488,6 @@ class DiagnosisService:
             "message": "Success",
             "data": None
         }
-    
-    def _process_step2_background(self, app, request_id, password, image_url):
-        """
-        백그라운드에서 Step2 추론을 실행하고 결과를 API 서버로 전송합니다.
-        """
-        # Flask 앱 컨텍스트 설정
-        with app.app_context():
-            try:
-                logger.debug(f"Step2 백그라운드 추론 시작: ID={request_id}")
-                
-                # 1. 이미지 다운로드
-                local_path = self._download_image(image_url)
-                
-                # 2. 이미지 로드 및 검증
-                image = Image.open(local_path)
-                self._validate_image(image)
-                
-                logger.debug(f"이미지 로드 성공: {local_path} ({image.width}x{image.height})")
-                
-                # 3. AI 모델 분석
-                if self.step2_model and self.step2_model.is_model_loaded():
-                    logger.debug(f"Step2 AI 모델 분석 시작: {local_path}")
-                    
-                    # 실제 AI 모델 추론
-                    prediction_result = self.step2_model.predict(image)
-                    
-                    # 4. API 서버로 성공 결과 전송
-                    callback_data = {
-                        "id": request_id,
-                        "password": password,
-                        "category": prediction_result['category'],
-                        "confidence": prediction_result['confidence'],
-                        "error": False,
-                        "message": None
-                    }
-                    
-                    self._send_callback_to_api_server(app, callback_data)
-                    
-                    logger.info(f"Step2 백그라운드 처리 완료: ID={request_id}, 카테고리={prediction_result['category']}")
-                    
-                else:
-                    # AI 모델이 로드되지 않은 경우
-                    error_msg = "Step2 AI 모델이 로드되지 않았습니다."
-                    logger.error(error_msg)
-                    
-                    # 에러를 API 서버로 전송
-                    self._send_error_to_api_server(app, request_id, password, error_msg)
-                    
-            except Exception as e:
-                error_msg = f"Step2 백그라운드 처리 중 오류 발생: {str(e)}"
-                logger.error(error_msg)
-                
-                # 에러를 API 서버로 전송
-                self._send_error_to_api_server(app, request_id, password, error_msg)
-    
-    def _send_callback_to_api_server(self, app, callback_data):
-        """
-        Step2 결과를 API 서버로 전송합니다.
-        
-        Args:
-            app: Flask 앱 인스턴스
-            callback_data (dict): 전송할 데이터
-        """
-        try:
-            # API 서버 URL 구성
-            api_server_url = app.config.get('API_SERVER_URL')
-            callback_endpoint = app.config.get('API_SERVER_CALLBACK_ENDPOINT')
-            
-            callback_url = f"{api_server_url}{callback_endpoint}"
-            
-            logger.debug(f"API 서버로 콜백 전송 시작: {callback_url}")
-            
-            # POST 요청 전송
-            timeout = app.config.get('IMAGE_DOWNLOAD_TIMEOUT', 30)
-            
-            response = requests.post(
-                callback_url,
-                json=callback_data,
-                headers={'Content-Type': 'application/json'},
-                timeout=timeout
-            )
-            response.raise_for_status()
-            
-            logger.info(f"API 서버 콜백 전송 성공: {response.status_code}")
-        except requests.RequestException as e:
-            logger.error(f"API 서버 콜백 전송 실패: {str(e)}")
-        except Exception as e:
-            logger.error(f"콜백 전송 중 예상치 못한 오류: {str(e)}")
-
-    def _send_error_to_api_server(self, app, request_id, password, error_message):
-        """
-        에러를 API 서버로 전송합니다.
-        
-        Args:
-            app: Flask 앱 인스턴스
-            request_id (str): 요청 ID
-            password (str): 패스워드
-            error_message (str): 에러 메시지
-        """
-        try:
-            callback_data = {
-                "id": request_id,
-                "password": password,
-                "category": None,
-                "confidence": None,
-                "error": True,
-                "message": error_message
-            }
-            
-            logger.debug(f"에러 콜백 전송: ID={request_id}, 에러={error_message}")
-            self._send_callback_to_api_server(app, callback_data)
-            
-        except Exception as e:
-            logger.error(f"에러 콜백 전송 중 오류: {str(e)}")
 
     def process_step3_diagnosis(self, second_step_result, attributes):
         """
@@ -520,17 +504,20 @@ class DiagnosisService:
             logger.info(f"Step3 진단 시작 - 2단계 결과: {second_step_result}")
             logger.info(f"속성 개수: {len(attributes)}")
             
-            # TODO: 실제 Step3 진단 로직 구현
-            # 현재는 임시 응답 반환
+            # 2단계 결과에 따른 직접 분기 처리
+            if second_step_result == "inflammation":
+                from .step3.inflammation import InflammationDiagnosis
+                diagnosis = InflammationDiagnosis()
+                result = diagnosis.diagnose(attributes)
+            elif second_step_result == "corneal":
+                from .step3.corneal import CornealDiagnosis
+                diagnosis = CornealDiagnosis()
+                result = diagnosis.diagnose(attributes)
+            else:
+                raise ValueError(f"지원하지 않는 2단계 진단 결과: {second_step_result}")
             
-            # 임시 진단 결과 (실제 구현 시 삭제 예정)
-            mock_result = {
-                "category": "keratitis",
-                "description": "LLM이 생성한 진단 결과"
-            }
-            
-            logger.info(f"Step3 진단 완료 - 결과: {mock_result}")
-            return mock_result
+            logger.info(f"Step3 진단 완료 - 결과: {result}")
+            return result
             
         except Exception as e:
             logger.error(f"Step3 진단 처리 중 오류 발생: {str(e)}")

@@ -5,11 +5,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    """애플리케이션 설정 클래스"""
+    """애플리케이션 기본 설정 클래스"""
     
     # Flask 설정
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
-    DEBUG = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    DEBUG = False
     
     # 데이터베이스 설정
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
@@ -18,10 +18,6 @@ class Config:
     # AI 모델 설정
     STEP1_MODEL_PATH = os.environ.get('STEP1_MODEL_PATH') or 'app/diagnosis/models/step1'
     STEP2_MODEL_PATH = os.environ.get('STEP2_MODEL_PATH') or 'app/diagnosis/models/step2'
-    
-    # API 서버 설정 (Step2 결과 콜백용)
-    API_SERVER_URL = os.environ.get('API_SERVER_URL') or 'http://host.docker.internal:8080'
-    API_SERVER_CALLBACK_ENDPOINT = os.environ.get('API_SERVER_CALLBACK_ENDPOINT') or '/diagnosis/step2'
     
     # 이미지 처리 설정
     MAX_IMAGE_SIZE = int(os.environ.get('MAX_IMAGE_SIZE', '4096'))
@@ -32,30 +28,28 @@ class Config:
     LOG_LEVEL = os.environ.get('LOG_LEVEL', 'INFO')
     
     # Swagger 설정
-    RESTX_MASK_SWAGGER = False  # Swagger UI에서 X-Fields 헤더 숨기기
+    RESTX_MASK_SWAGGER = False
 
 class DevelopmentConfig(Config):
-    """Development configuration"""
+    """개발 환경 설정"""
     DEBUG = True
     SQLALCHEMY_ECHO = True  # SQL 쿼리 로깅
-    API_SERVER_URL = os.environ.get('DEV_API_SERVER_URL') or 'http://host.docker.internal:8080'
-
-class TestingConfig(Config):
-    """Testing configuration"""
-    DEBUG = True
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('TEST_DATABASE_URL', 'sqlite:///test.db')
-    API_SERVER_URL = os.environ.get('TEST_API_SERVER_URL') or 'http://localhost:8080'
+    
+    # API 서버 설정 (Step2 결과 콜백용)
+    API_SERVER_URL = 'http://host.docker.internal:8080'
+    API_SERVER_CALLBACK_ENDPOINT = '/diagnosis/step2'
 
 class ProductionConfig(Config):
-    """Production configuration"""
+    """프로덕션 환경 설정"""
     DEBUG = False
     SQLALCHEMY_ECHO = False
-    API_SERVER_URL = os.environ.get('PROD_API_SERVER_URL') or 'https://api.production-server.com'
+    
+    # API 서버 설정 (추후 설정)
+    API_SERVER_URL = os.environ.get('API_SERVER_URL')  # 환경변수에서만 가져옴
+    API_SERVER_CALLBACK_ENDPOINT = '/diagnosis/step2'
 
 # Configuration dictionary
 config_by_name = {
     'development': DevelopmentConfig,
-    'testing': TestingConfig,
     'production': ProductionConfig
 } 

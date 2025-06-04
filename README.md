@@ -11,17 +11,16 @@
 
 #### 모델 파일 준비
 
-Step1 질병여부판단 모델을 다음 경로에 배치해야 합니다:
+Step1, 2 질병여부판단 모델을 다음 경로에 배치해야 합니다:
 
 ```
-app/diagnosis/models/step1/
+app/diagnosis/models
 ```
 
 지원하는 모델 파일 형식:
 
-- `best_model.pth` (권장)
+- `step1.pth` (권장)
 - `step1` (바이너리 파일)
-- `model.pth`
 
 #### 모델 요구사항
 
