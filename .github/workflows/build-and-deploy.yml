@@ -1,0 +1,78 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+            aws-region: ap-northeast-2
+
+      - name: Get Parameters from SSM
+        id: get-ssm-params
+        run: |
+            DB_URL=$(aws ssm get-parameter --name "/annyang/db/url" --with-decryption --query "Parameter.Value" --output text)
+            DB_USERNAME=$(aws ssm get-parameter --name "/annyang/db/username" --with-decryption --query "Parameter.Value" --output text)
+            DB_PASSWORD=$(aws ssm get-parameter --name "/annyang/db/password" --with-decryption --query "Parameter.Value" --output text)
+            
+            # CodeDeploy 관련 파라미터 가져오기
+            CODEDEPLOY_APP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/app_name" --query "Parameter.Value" --output text)
+            CODEDEPLOY_GROUP_NAME=$(aws ssm get-parameter --name "/annyang/deploy/api-server/group_name" --query "Parameter.Value" --output text)
+            CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
+
+            # AI 서버 URL 가져오기
+            AI_SERVER_URL=$(aws ssm get-parameter --name "/annyang/ai-server/url" --query "Parameter.Value" --output text)
+            
+            echo "DB_URL=$DB_URL" >> $GITHUB_ENV
+            echo "DB_USERNAME=$DB_USERNAME" >> $GITHUB_ENV
+            echo "DB_PASSWORD=$DB_PASSWORD" >> $GITHUB_ENV
+            
+            # CodeDeploy 파라미터를 환경 변수로 저장
+            echo "CODEDEPLOY_APP_NAME=$CODEDEPLOY_APP_NAME" >> $GITHUB_ENV
+            echo "CODEDEPLOY_GROUP_NAME=$CODEDEPLOY_GROUP_NAME" >> $GITHUB_ENV
+            echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
+
+            # AI 서버 URL을 환경 변수로 저장
+            echo "AI_SERVER_URL=$AI_SERVER_URL" >> $GITHUB_ENV
+            
+      - name: Fetch files from S3
+        run: |
+            mkdir -p app/diagnosis/models/step1
+            mkdir -p app/diagnosis/models/step2
+            aws s3 cp s3://${{ env.CODEDEPLOY_BUCKET }}/step1 app/diagnosis/models/step1/step1
+            aws s3 cp s3://${{ env.CODEDEPLOY_BUCKET }}/step2 app/diagnosis/models/step2/step2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build -t my-app-image -f Dockerfile .
+
+      - name: Save Docker image as tar
+        run: |
+          docker save my-app-image -o my-app-image.tar
+
+      - name: Compress Docker image using gzip
+        run: |
+          gzip my-app-image.tar
+
+      - name: Upload compressed image to S3
+        run: |
+          aws s3 cp my-app-image.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/my-app-image.tar.gz
+        
+      - name: Clean up
+        run: |
+          rm -f my-app-image.tar.gz
+          docker rmi my-app-image || true
