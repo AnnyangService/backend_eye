@@ -456,7 +456,7 @@ class DiagnosisService:
         try:
             # API 서버 URL 구성
             api_server_url = app.config.get('API_SERVER_URL')
-            callback_endpoint = app.config.get('API_SERVER_CALLBACK_ENDPOINT', '/diagnosis/step2/callback')
+            callback_endpoint = app.config.get('API_SERVER_CALLBACK_ENDPOINT')
             
             callback_url = f"{api_server_url}{callback_endpoint}"
             
