@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload compressed image to S3
         run: |
-          aws s3 cp my-app-image.tar.gz s3://${{ secrets.S3_BUCKET_NAME }}/my-app-image.tar.gz
+          aws s3 cp my-app-image.tar.gz s3://${{ env.CODEDEPLOY_BUCKET }}/my-app-image.tar.gz
         
       - name: Clean up
         run: |
