@@ -1,6 +1,7 @@
 from flask import request
 from flask_restx import Namespace, Resource, fields
 from .service import DiagnosisService
+import logging
 
 # Create namespace for diagnosis API
 diagnosis_ns = Namespace('diagnosis', description='질병 진단 API')
@@ -283,10 +284,6 @@ class DiagnosisStep2Resource(Resource):
 class DiagnosisStep3Resource(Resource):
     @diagnosis_ns.doc('질병분석 Step3')
     @diagnosis_ns.expect(step3_request_model, validate=True)
-    @diagnosis_ns.marshal_with(step3_response_model, code=200)
-    @diagnosis_ns.marshal_with(error_response_model, code=400)
-    @diagnosis_ns.marshal_with(error_response_model, code=500)
-    @diagnosis_ns.marshal_with(error_response_model, code=503)
     def post(self):
         """
         질병분석 Step3 - 세부 진단
@@ -353,15 +350,14 @@ class DiagnosisStep3Resource(Resource):
                     }, 400
             
             # Step3 진단 처리
+            logger = logging.getLogger(__name__)
+            logger.info(f"API Step3 요청 시작 - secondStepResult: {second_step_result}, attributes 개수: {len(attributes)}")
+            
             result = diagnosis_service.process_step3_diagnosis(second_step_result, attributes)
             
-            response_data = {
-                'success': True,
-                'message': 'Success',
-                'data': result
-            }
+            logger.info("API Step3 요청 완료")
             
-            return response_data, 200
+            return result, 200
             
         except Exception as e:
             error_message = str(e)

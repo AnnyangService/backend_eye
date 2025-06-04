@@ -498,7 +498,7 @@ class DiagnosisService:
             attributes (list): 진단 속성 리스트
             
         Returns:
-            dict: 진단 결과 {"category": str, "description": str}
+            dict: 표준 응답 형식 {"success": bool, "message": str, "data": {"category": str, "description": str}}
         """
         try:
             logger.info(f"Step3 진단 시작 - 2단계 결과: {second_step_result}")
@@ -516,12 +516,29 @@ class DiagnosisService:
             else:
                 raise ValueError(f"지원하지 않는 2단계 진단 결과: {second_step_result}")
             
-            logger.info(f"Step3 진단 완료 - 결과: {result}")
-            return result
+            logger.info(f"Step3 진단 완료 - 카테고리: {result.get('category')}")
+            
+            # 표준 응답 형식으로 반환
+            final_response = {
+                "success": True,
+                "message": "Success",
+                "data": {
+                    "category": result.get('category'),
+                    "description": result.get('description')
+                }
+            }
+            
+            return final_response
             
         except Exception as e:
             logger.error(f"Step3 진단 처리 중 오류 발생: {str(e)}")
             import traceback
             logger.error(f"상세 에러: {traceback.format_exc()}")
-            raise Exception(f"Step3 진단 처리 실패: {str(e)}")
+            
+            # 에러 응답 형식으로 반환
+            return {
+                "success": False,
+                "message": f"Step3 진단 처리 실패: {str(e)}",
+                "data": None
+            }
 

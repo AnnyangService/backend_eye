@@ -194,26 +194,27 @@ class CornealDiagnosis:
             
             # MedicalDiagnosisAgent를 통해 보고서 생성
             try:
-                from .diagnosis_agent import MedicalDiagnosisAgent
+                from ..diagnosis_agent import MedicalDiagnosisAgent
                 agent = MedicalDiagnosisAgent()
                 report = agent.generate_report(result)
                 logger.info("의료 보고서 생성 완료")
                 
-                # 보고서 출력
-                print(report)
-                
-                # 원본 진단 결과도 함께 반환
-                result["medical_report"] = report
-                return result
+                return {
+                    "category": best_disease,
+                    "description": report
+                }
                 
             except Exception as e:
-                logger.warning(f"보고서 생성 실패, 원본 결과만 반환: {str(e)}")
-                return result
+                logger.warning(f"보고서 생성 실패, 기본 결과 반환: {str(e)}")
+                return {
+                    "category": best_disease,
+                    "description": f"{best_disease}으로 진단되었습니다. (유사도: {best_score:.1%})"
+                }
             
         except Exception as e:
             logger.error(f"각막류 진단 중 오류: {str(e)}")
             # 임시 응답 반환 (오류 시)
             return {
                 "category": "진단_실패",
-                "attribute_analysis": None
+                "description": f"각막류 진단 처리 중 오류가 발생했습니다: {str(e)}"
             }
