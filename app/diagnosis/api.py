@@ -7,65 +7,84 @@ diagnosis_ns = Namespace('diagnosis', description='질병 진단 API')
 
 # Define request model for Step1
 step1_request_model = diagnosis_ns.model('Step1Request', {
-    'image_url': fields.Url(required=True, description='분석할 이미지의 URL')
+    'image_url': fields.Url(required=True, description='분석할 이미지의 URL', example="image.png")
 })
 
 # Define response models for Step1
 step1_data_model = diagnosis_ns.model('Step1Data', {
-    'is_normal': fields.Boolean(required=True, description='정상 여부 (true: 정상, false: 이상)'),
-    'confidence': fields.Float(required=True, description='신뢰도 (0.0 ~ 1.0)')
+    'is_normal': fields.Boolean(required=True, description='정상 여부 (true: 정상, false: 이상)', example=False),
+    'confidence': fields.Float(required=True, description='신뢰도 (0.0 ~ 1.0)', example=0.87)
 })
 
 # Define request model for Step2
 step2_request_model = diagnosis_ns.model('Step2Request', {
-    'id': fields.String(required=True, description='요청 ID'),
-    'password': fields.String(required=True, description='AI 서버 -> API 서버 호출시 필요한 패스워드'),
-    'image_url': fields.Url(required=True, description='분석할 이미지의 URL')
+    'id': fields.String(required=True, description='요청 ID', example="01JTTKJYG28CFYMBKXC0Q80F61"),
+    'password': fields.String(required=True, description='AI 서버 -> API 서버 호출시 필요한 패스워드', example="a123456789!"),
+    'image_url': fields.Url(required=True, description='분석할 이미지의 URL', example="image.png")
 })
 
 step1_response_model = diagnosis_ns.model('Step1Response', {
-    'success': fields.Boolean(required=True, description='요청 성공 여부'),
-    'message': fields.String(required=True, description='응답 메시지'),
+    'success': fields.Boolean(required=True, description='요청 성공 여부', example=True),
+    'message': fields.String(required=True, description='응답 메시지', example="Success"),
     'data': fields.Nested(step1_data_model, required=True, description='진단 결과 데이터')
 })
 
 # Define response model for Step2 (즉시 응답)
 step2_response_model = diagnosis_ns.model('Step2Response', {
-    'success': fields.Boolean(required=True, description='요청 성공 여부'),
-    'message': fields.String(required=True, description='응답 메시지'),
-    'data': fields.Raw(description='항상 null (비동기 처리로 인해 즉시 응답)')
+    'success': fields.Boolean(required=True, description='요청 성공 여부', example=True),
+    'message': fields.String(required=True, description='응답 메시지', example="Success"),
+    'data': fields.Raw(description='항상 null (비동기 처리로 인해 즉시 응답)', example=None)
 })
 
 # Define request model for Step3
 step3_attribute_model = diagnosis_ns.model('Step3Attribute', {
-    'id': fields.Integer(required=True, description='룰 ID'),
-    'description': fields.String(required=True, description='속성 설명')
+    'id': fields.Integer(required=True, description='룰 ID', example=1),
+    'description': fields.String(required=True, description='속성 설명', example="미세한 분비물")
 })
 
 step3_request_model = diagnosis_ns.model('Step3Request', {
     'secondStepDiagnosisResult': fields.String(required=True, description='2단계 진단 결과 (inflammation 또는 corneal)', 
-                                              enum=['inflammation', 'corneal']),
+                                              enum=['inflammation', 'corneal'], example="inflammation"),
     'attributes': fields.List(fields.Nested(step3_attribute_model), required=True, 
-                             description='진단 속성 리스트')
+                             description='진단 속성 리스트',
+                             example=[
+                                 {
+                                     "id": 1,
+                                     "description": "주로 눈문을 많이 흘리고 미세하게 분비물이 있어요."
+                                 },
+                                 {
+                                     "id": 2,
+                                     "description": "천천히 진행돼요."
+                                 },
+                                 {
+                                     "id": 3,
+                                     "description": "눈물을 흘리고 눈 뜨는 데 어려움이 없어요. 각막 표면이 매끄러워요."
+                                 },
+                                 {
+                                     "id": 4,
+                                     "description": "한쪽 눈에서 발생해요."
+                                 }
+                             ])
 })
 
 # Define response model for Step3
 step3_data_model = diagnosis_ns.model('Step3Data', {
-    'category': fields.String(required=True, description='진단 카테고리'),
-    'description': fields.String(required=True, description='LLM이 생성한 진단 결과')
+    'category': fields.String(required=True, description='진단 카테고리', example="알레르기성 결막염"),
+    'description': fields.String(required=True, description='LLM이 생성한 진단 결과', 
+                                example="환자의 증상과 관찰된 징후를 종합적으로 분석한 결과, 알레르기성 결막염으로 진단됩니다. 안구 표면의 점상 출혈과 결막 부종, 그리고 눈물 분비량 감소가 주요 소견으로 확인되었습니다. 적절한 항염 치료와 함께 알레르기 원인 회피가 권장됩니다.")
 })
 
 step3_response_model = diagnosis_ns.model('Step3Response', {
-    'success': fields.Boolean(required=True, description='요청 성공 여부'),
-    'message': fields.String(required=True, description='응답 메시지'),
+    'success': fields.Boolean(required=True, description='요청 성공 여부', example=True),
+    'message': fields.String(required=True, description='응답 메시지', example="Success"),
     'data': fields.Nested(step3_data_model, required=True, description='진단 결과 데이터')
 })
 
 error_response_model = diagnosis_ns.model('ErrorResponse', {
-    'success': fields.Boolean(description='요청 성공 여부'),
-    'error_code': fields.String(description='에러 코드'),
-    'message': fields.String(description='에러 메시지'),
-    'details': fields.Raw(description='에러 상세 정보')
+    'success': fields.Boolean(description='요청 성공 여부', example=False),
+    'error_code': fields.String(description='에러 코드', example="VALIDATION_ERROR"),
+    'message': fields.String(description='에러 메시지', example="secondStepDiagnosisResult is required"),
+    'details': fields.Raw(description='에러 상세 정보', example={"secondStepDiagnosisResult": "This field is required"})
 })
 
 # Initialize service
