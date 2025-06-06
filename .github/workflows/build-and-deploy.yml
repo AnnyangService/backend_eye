@@ -26,11 +26,19 @@ jobs:
       - name: Get Parameters from SSM
         id: get-ssm-params
         run: |
-            CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
-            echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
 
             API_SERVER_URL=$(aws ssm get-parameter --name "/annyang/api-server/url" --query "Parameter.Value" --output text)
             echo "API_SERVER_URL=$API_SERVER_URL" >> $GITHUB_ENV
+
+            # CodeDeploy 관련 파라미터 가져오기
+            CODEDEPLOY_APP_NAME=$(aws ssm get-parameter --name "/annyang/server-deploy/app_name" --query "Parameter.Value" --output text)
+            CODEDEPLOY_GROUP_NAME=$(aws ssm get-parameter --name "/annyang/server-deploy/ai-server/group_name" --query "Parameter.Value" --output text)
+            CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/server-deploy/bucket" --query "Parameter.Value" --output text)
+        
+            # CodeDeploy 파라미터를 환경 변수로 저장
+            echo "CODEDEPLOY_APP_NAME=$CODEDEPLOY_APP_NAME" >> $GITHUB_ENV
+            echo "CODEDEPLOY_GROUP_NAME=$CODEDEPLOY_GROUP_NAME" >> $GITHUB_ENV
+            echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
 
       - name: Replace environment variables in .env.production
         run: |
@@ -59,10 +67,28 @@ jobs:
         run: |
           gzip my-app-image.tar
 
-      - name: Upload compressed image to S3
+      - name: Prepare Deployment Bundle
         run: |
-          aws s3 cp my-app-image.tar.gz s3://${{ env.CODEDEPLOY_BUCKET }}/my-app-image.tar.gz
-        
+            mkdir -p codedeploy-bundle
+            cp my-app-image.tar.gz codedeploy-bundle/my-app-image.tar.gz
+            cp .github/deploy/appspec.yml codedeploy-bundle/
+            cp -r .github/deploy/scripts codedeploy-bundle/
+            cd codedeploy-bundle
+            zip -r ../deploy.zip .
+            cd ..
+            
+      - name: Upload to S3
+        run: |
+            aws s3 cp deploy.zip s3://${{ env.CODEDEPLOY_BUCKET }}/ai-server-deploy.zip
+            
+      - name: Create CodeDeploy Deployment
+        run: |
+            aws deploy create-deployment \
+            --application-name ${{ env.CODEDEPLOY_APP_NAME }} \
+            --deployment-group-name ${{ env.CODEDEPLOY_GROUP_NAME }} \
+            --s3-location bucket=${{ env.CODEDEPLOY_BUCKET }},key=ai-server-deploy.zip,bundleType=zip \
+            --description "Deployment from GitHub Actions workflow"
+
       - name: Clean up
         run: |
           rm -f my-app-image.tar.gz
