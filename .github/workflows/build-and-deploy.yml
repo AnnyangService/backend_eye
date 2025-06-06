@@ -49,7 +49,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t my-app-image -f Dockerfile .
+          docker build --target production -t my-app-image -f Dockerfile .
 
       - name: Save Docker image as tar
         run: |
