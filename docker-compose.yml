@@ -21,3 +21,9 @@ services:
       - .:/app
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    deploy:
+      resources:
+        limits:
+          memory: 1.8G  # t3.small의 90% 사용
+        reservations:
+          memory: 512M
