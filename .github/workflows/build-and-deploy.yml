@@ -29,7 +29,7 @@ jobs:
             CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
             echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
 
-            API_SERVER_URL=$(aws ssm get-parameter --name "/annyang/deploy/api-server/url" --query "Parameter.Value" --output text)
+            API_SERVER_URL=$(aws ssm get-parameter --name "/annyang/api-server/url" --query "Parameter.Value" --output text)
             echo "API_SERVER_URL=$API_SERVER_URL" >> $GITHUB_ENV
             
       - name: Variable Substitution
