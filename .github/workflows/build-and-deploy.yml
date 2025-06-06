@@ -28,7 +28,18 @@ jobs:
         run: |
             CODEDEPLOY_BUCKET=$(aws ssm get-parameter --name "/annyang/deploy/api-server/bucket" --query "Parameter.Value" --output text)
             echo "CODEDEPLOY_BUCKET=$CODEDEPLOY_BUCKET" >> $GITHUB_ENV
+
+            API_SERVER_URL=$(aws ssm get-parameter --name "/annyang/deploy/api-server/url" --query "Parameter.Value" --output text)
+            echo "API_SERVER_URL=$API_SERVER_URL" >> $GITHUB_ENV
             
+      - name: Variable Substitution
+        uses: microsoft/variable-substitution@v1
+        with:
+            files: '.env.production'
+        env:
+            API_SERVER_URL: ${{ env.API_SERVER_URL }}
+            GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
       - name: Fetch files from S3
         run: |
             mkdir -p app/diagnosis/models/step1

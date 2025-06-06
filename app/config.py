@@ -1,8 +1,12 @@
 import os
 from dotenv import load_dotenv
 
-# Load .env file
-load_dotenv()
+if(os.environ.get('FLASK_ENV') == 'production'):
+    # 프로덕션 환경에서는 .env.production 파일을 로드
+    load_dotenv('.env.production')
+else:
+    # 개발 환경에서는 .env 파일을 로드
+    load_dotenv('.env')
 
 class Config:
     """애플리케이션 기본 설정 클래스"""

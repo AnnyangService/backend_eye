@@ -20,7 +20,7 @@ RUN pip install --no-cache-dir torch==2.2.0 torchvision==0.17.0 --index-url http
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Stage 2: Runtime
-FROM python:3.12-slim
+FROM python:3.12-slim AS base
 
 # Set working directory
 WORKDIR /app
@@ -37,13 +37,30 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # Copy application code
 COPY . .
 
-# Set environment variables
-ENV PYTHONPATH=/app
-ENV FLASK_APP=run.py
-ENV FLASK_ENV=development
+# 사용자 생성
+RUN adduser --disabled-password --gecos '' appuser
+RUN chown -R appuser:appuser /app
 
 # Expose port
 EXPOSE 5000
 
+# Set common environment variables
+ENV PYTHONPATH=/app
+ENV FLASK_APP=run.py
+
+# development stage
+FROM base AS development
+USER appuser
+ENV FLASK_ENV=development
+ENV FLASK_CONFIG=development
 # Run the application using Python directly
 CMD ["python", "run.py"]
+
+# production stage
+FROM base AS production
+USER appuser
+ENV FLASK_ENV=production
+ENV FLASK_CONFIG=production
+ENV GUNICORN_WORKERS=2
+# Run the application using Gunicorn
+CMD ["gunicorn", "wsgi:app", "--config", "gunicorn.conf.py"]
