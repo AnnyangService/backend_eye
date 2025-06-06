@@ -4,3 +4,5 @@ images
 app/diagnosis/models
 .DS_Store
 instance
+
+!.env.production
