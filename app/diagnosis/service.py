@@ -524,7 +524,9 @@ class DiagnosisService:
                 "message": "Success",
                 "data": {
                     "category": result.get('category'),
-                    "description": result.get('description')
+                    "summary": result.get('summary', f"🔍 진단 결과: {result.get('category')}"),
+                    "details": result.get('details', f"{result.get('category')}으로 진단되었습니다."),
+                    "attribute_analysis": result.get('attribute_analysis', {})
                 }
             }
             

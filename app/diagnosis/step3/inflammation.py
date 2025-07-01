@@ -195,19 +195,23 @@ class InflammationDiagnosis:
             try:
                 from ..diagnosis_agent import MedicalDiagnosisAgent
                 agent = MedicalDiagnosisAgent()
-                report = agent.generate_report(result)
+                report_data = agent.generate_report(result)
                 logger.info("의료 보고서 생성 완료")
                 
                 return {
                     "category": best_disease,
-                    "description": report
+                    "summary": report_data.get("summary", f"🔍 진단 결과: {best_disease}"),
+                    "details": report_data.get("details", f"{best_disease}으로 진단되었습니다. (유사도: {best_score:.1%})"),
+                    "attribute_analysis": report_data.get("attribute_analysis", {})
                 }
                 
             except Exception as e:
                 logger.warning(f"보고서 생성 실패, 기본 결과 반환: {str(e)}")
                 return {
                     "category": best_disease,
-                    "description": f"{best_disease}으로 진단되었습니다. (유사도: {best_score:.1%})"
+                    "summary": f"🔍 진단 결과: {best_disease}",
+                    "details": f"{best_disease}으로 진단되었습니다. (유사도: {best_score:.1%})",
+                    "attribute_analysis": result.get("attribute_analysis", {})
                 }
             
         except Exception as e:
@@ -215,6 +219,8 @@ class InflammationDiagnosis:
             # 임시 응답 반환 (오류 시)
             return {
                 "category": "진단_실패",
-                "description": f"염증류 진단 처리 중 오류가 발생했습니다: {str(e)}"
+                "summary": "🔍 진단 결과: 진단_실패",
+                "details": f"염증류 진단 처리 중 오류가 발생했습니다: {str(e)}",
+                "attribute_analysis": {}
             }
     

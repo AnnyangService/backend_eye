@@ -2,7 +2,6 @@
 Step3 진단 결과 LLM 보고서 생성 에이전트
 
 염증류/각막류 진단 결과를 받아서 LLM을 통해 의료 보고서를 생성합니다.
-현재는 임시로 포맷팅된 출력을 제공하며, 추후 LLM 호출 기능을 추가할 예정입니다.
 """
 
 import logging
@@ -99,10 +98,6 @@ class MedicalDiagnosisAgent:
             return "LLM 서비스를 사용할 수 없습니다."
         
         try:
-            print(self.model_id)
-            print(self.generation_config)
-            print(prompt)
-            print(self.client)
             response = self.client.models.generate_content(
                 model=self.model_id,
                 contents=prompt,
@@ -114,9 +109,9 @@ class MedicalDiagnosisAgent:
             return f"LLM 호출 실패: {str(e)}"
     
     
-    def generate_report(self, diagnosis_result: Dict[str, Any]) -> str:
+    def generate_report(self, diagnosis_result: Dict[str, Any]) -> Dict[str, Any]:
         """
-        진단 결과를 받아서 의료 보고서를 생성
+        진단 결과를 받아서 의료 보고서를 생성 (요약과 상세 정보 분리)
         
         Args:
             diagnosis_result (dict): 진단 결과
@@ -133,11 +128,19 @@ class MedicalDiagnosisAgent:
                 }
         
         Returns:
-            str: 생성된 의료 보고서
+            dict: {
+                "summary": str,      # 핵심 요약
+                "details": str,      # 상세 보고서
+                "attribute_analysis": dict  # 속성별 분석 결과
+            }
         """
         try:
             if not diagnosis_result or 'category' not in diagnosis_result:
-                return "진단 결과가 없습니다."
+                return {
+                    "summary": "진단 결과가 없습니다.",
+                    "details": "진단 결과가 없습니다.",
+                    "attribute_analysis": {}
+                }
             
             category = diagnosis_result.get('category', '알 수 없음')
             attribute_analysis = diagnosis_result.get('attribute_analysis', {})
@@ -146,66 +149,265 @@ class MedicalDiagnosisAgent:
             
             if not attribute_analysis:
                 logger.warning("상세 분석 정보가 없음")
-                return f"진단 결과: {category}\n상세 분석 정보가 없습니다."
+                return {
+                    "summary": f"진단 결과: {category}",
+                    "details": f"진단 결과: {category}\n상세 분석 정보가 없습니다.",
+                    "attribute_analysis": {}
+                }
             
-            # LLM을 사용한 자연스러운 보고서 생성
+            # 요약 생성 (LLM 없이)
+            summary = self._generate_summary(category, attribute_analysis)
+            
+            # 상세 보고서 생성 (LLM 1번째 호출)
             if not self.api_available:
                 logger.error("LLM API를 사용할 수 없습니다.")
-                return "LLM API를 사용할 수 없어 보고서를 생성할 수 없습니다. API 설정을 확인해주세요."
+                details = "LLM API를 사용할 수 없어 상세 보고서를 생성할 수 없습니다. API 설정을 확인해주세요."
+                enhanced_analysis = attribute_analysis
+            else:
+                details = self._generate_disease_details(category, attribute_analysis)
+                enhanced_analysis = self._generate_attribute_analysis(category, attribute_analysis)
             
-            return self._generate_llm_report(category, attribute_analysis)
+            return {
+                "summary": summary,
+                "details": details,
+                "attribute_analysis": enhanced_analysis
+            }
             
         except Exception as e:
             logger.error(f"보고서 생성 중 오류: {str(e)}")
-            return f"보고서 생성 실패: {str(e)}"
+            return {
+                "summary": f"보고서 생성 실패: {str(e)}",
+                "details": f"보고서 생성 실패: {str(e)}",
+                "attribute_analysis": {}
+            }
     
-    def _generate_llm_report(self, category: str, attribute_analysis: Dict[str, Any]) -> str:
-        """LLM을 사용하여 자연스러운 의료 보고서 생성"""
+    def _generate_disease_details(self, category: str, attribute_analysis: Dict[str, Any]) -> str:
+        """LLM을 사용하여 진단된 질병의 특성과 규칙을 기반으로 상세 보고서 생성 (2단계 프롬프트 체이닝)"""
         
-        # 1단계: 컨텍스트 정보 구성
-        context_info = self._build_context_info(category, attribute_analysis)
+        # 진단된 질병의 특성 정보 가져오기
+        disease_info = self.disease_rules.get(category, {})
         
-        # 2단계: 첫 번째 프롬프트 - 수의학 전문가 역할 설정 및 기본 가이드라인
+        # 컨텍스트 정보 구성 (summary와 겹치지 않도록)
+        context_info = self._build_disease_context(category, disease_info, attribute_analysis)
+        
+        # 1단계: 초기 보고서 생성
         first_prompt = f"""
-당신은 경험이 풍부한 수의학 안과 전문의입니다. 반려동물의 안과 질환 진단 결과를 바탕으로 보호자에게 설명할 의료 보고서를 작성해야 합니다.
+당신은 반려동물의 안과 질환을 분석하는 전문가입니다. 진단 결과를 바탕으로 보호자에게 설명할 상세 보고서를 작성해주세요.
 
-중요한 주의사항:
+다음 원칙을 반드시 지켜주세요:
 1. 이 진단 결과는 참고용이며, 반드시 수의사의 직접 진료를 받아야 합니다.
 2. 보호자가 과도하게 걱정하거나 맹신하지 않도록 신중하게 설명해야 합니다.
 3. 의학적 전문 용어보다는 이해하기 쉬운 표현을 사용해야 합니다.
 4. 추가 검사나 치료의 필요성을 언급해야 합니다.
 
+다음 형식으로 작성해주세요:
+
+# {category} 진단 보고서
+
+(간단한 진단 결과 요약 - 2-3문장)
+
+# 1. {category}란?
+
+## [질병 개요]
+({category}에 대한 기본 설명)
+
+## [주요 증상]
+({category}의 특징적인 증상들)
+
+# 2. 관찰된 증상과의 일치도
+
+## [일치하는 증상]
+(관찰된 증상 중 {category}와 일치하는 부분)
+
+## [주의할 증상]
+(관찰된 증상 중 {category}와 다른 부분이나 주의점)
+
+# 3. 주의사항 및 권고사항
+
+## [치료 방향]
+(치료에 대한 권고사항)
+
+## [예후 및 관리]
+(예후와 관리 방법)
+
+진단 정보:
+{context_info}
+
 다음은 반려동물의 안과 질환 분류와 주요 특징입니다:
 {self._get_disease_knowledge()}
 
-이 정보를 바탕으로 진단 결과를 설명할 준비가 되었나요? 준비되었다면 "준비완료"라고 답변해주세요.
+위의 정보를 바탕으로 {category}에 대한 상세 보고서를 작성해주세요.
 """
         
         first_response = self._call_gemini(first_prompt)
-        logger.debug(f"첫 번째 프롬프트 응답: {first_response}")
         
-        # 3단계: 두 번째 프롬프트 - 구체적인 진단 결과 분석 및 보고서 생성
+        # 2단계: 첫 번째 응답을 받아서 다듬기
         second_prompt = f"""
-이제 구체적인 진단 결과를 분석하여 보호자를 위한 의료 보고서를 작성해주세요.
+다음은 반려동물의 안과 질환 진단 보고서 초안입니다:
 
-{context_info}
+{first_response}
 
-위의 정보를 바탕으로 다음 형식으로 의료 보고서를 작성해주세요:
+반드시 다음 형식으로 정확히 작성해주세요:
 
-1. 진단 결과 요약
-2. 증상 분석 설명 (각 관찰된 증상이 어떤 질병의 특징과 얼마나 유사한지)
-3. 주의사항 및 권고사항
+# {category} 진단 보고서
 
-보고서는 보호자가 이해하기 쉽고, 적절한 수준의 안심과 주의를 줄 수 있도록 작성해주세요.
+(간단한 진단 결과 요약 - 2-3문장)
+
+# 1. {category}란?
+
+## [질병 개요]
+({category}에 대한 기본 설명)
+
+## [주요 증상]
+({category}의 특징적인 증상들)
+
+# 2. 관찰된 증상과의 일치도
+
+## [일치하는 증상]
+(관찰된 증상 중 {category}와 일치하는 부분)
+
+## [주의할 증상]
+(관찰된 증상 중 {category}와 다른 부분이나 주의점)
+
+# 3. 주의사항 및 권고사항
+
+## [치료 방향]
+(치료에 대한 권고사항)
+
+## [예후 및 관리]
+(예후와 관리 방법)
+
+중요한 지시사항:
+- 반드시 위의 형식을 정확히 따라주세요
+- 대제목은 #으로 시작하고 1. 2. 3. 숫자를 붙여주세요
+- 소제목은 ##으로 시작하고 []로 감싸주세요
+- "~~했음", "~~임" 같은 말투는 사용하지 마세요
+- "다음은 개선된 보고서입니다" 같은 문장은 사용하지 마세요
+- 동물병원 수의사 컨셉은 제거하고 객관적인 분석 보고서로 작성해주세요
+- 보호자가 이해하기 쉽고 적절한 수준의 안심과 주의를 줄 수 있도록 작성해주세요
 """
         
         final_response = self._call_gemini(second_prompt)
-        logger.info(f"LLM 기반 보고서 생성 완료: {category}")
         
         return final_response
     
+    def _build_disease_context(self, category: str, disease_info: Dict[str, str], attribute_analysis: Dict[str, Any]) -> str:
+        """진단된 질병의 특성과 규칙을 기반으로 컨텍스트 정보 구성 (details용)"""
+        
+        context_parts = [f"진단된 질병: {category}"]
+        
+        # 진단된 질병의 특성 정보
+        if disease_info:
+            context_parts.append("\n[질병의 주요 특징]")
+            for attr_name, description in disease_info.items():
+                context_parts.append(f"• {attr_name}: {description}")
+        
+        # 관찰된 증상과의 일치도 분석
+        context_parts.append("\n[관찰된 증상과의 일치도]")
+        for attr_name, attr_data in attribute_analysis.items():
+            user_input = attr_data.get('user_input', '정보 없음')
+            most_similar = attr_data.get('most_similar_disease', '알 수 없음')
+            similarity = attr_data.get('similarity', 0.0)
+            
+            context_parts.append(f"• {attr_name}: '{user_input}' → {most_similar}과 {similarity:.1%} 일치")
+        
+        return "\n".join(context_parts)
+    
+    def _generate_attribute_analysis(self, category: str, attribute_analysis: Dict[str, Any]) -> Dict[str, Any]:
+        """LLM을 사용하여 속성별 상세 분석 생성 (attribute_analysis용, 2단계 프롬프트 체이닝)"""
+        
+        enhanced_analysis = {}
+        
+        for attr_name, attr_data in attribute_analysis.items():
+            user_input = attr_data.get('user_input', '정보 없음')
+            most_similar = attr_data.get('most_similar_disease', '알 수 없음')
+            similarity = attr_data.get('similarity', 0.0)
+            all_similarities = attr_data.get('all_similarities', {})
+            
+            # 1단계: 초기 증상 분석
+            first_prompt = f"""
+당신은 고양이의 눈 질병 증상을 분석하는 전문가입니다. 특정 증상이 어떤 질병과 일치하는지 분석해주세요.
+
+분석 원칙:
+1. 객관적이고 정확한 분석을 제공해야 합니다.
+2. 의학적 전문 용어보다는 이해하기 쉬운 표현을 사용해야 합니다.
+3. 추가로 확인해야 할 증상이나 주의사항을 언급해야 합니다.
+
+분석 대상 속성: {attr_name}
+관찰된 증상: {user_input}
+가장 유사한 질병: {most_similar} (유사도: {similarity:.1%})
+
+다른 질병과의 유사도:
+{self._format_similarities(all_similarities)}
+
+다음은 반려동물의 안과 질환 분류와 주요 특징입니다:
+{self._get_disease_knowledge()}
+
+이 증상에 대해 다음 내용을 중심으로 분석해주세요:
+- 이 증상이 {most_similar}과 얼마나 일치하는지
+- 다른 질병과의 차이점
+"""
+            
+            try:
+                first_response = self._call_gemini(first_prompt)
+                
+                # 2단계: 첫 번째 응답을 받아서 다듬기
+                second_prompt = f"""
+다음은 증상 분석 초안입니다:
+
+{first_response}
+
+반드시 다음 형식으로 정확히 작성해주세요:
+
+# 1. {category}와 유사성
+
+제공된 정보에 따르면 {most_similar}과 {similarity:.1%} 일치합니다.
+
+## [일치하는 점]
+(이 증상이 {most_similar}과 일치하는 부분을 설명)
+
+## [주의할 점]
+(이 증상에서 {most_similar}과 다른 부분이나 주의해야 할 점을 설명)
+
+# 2. 다른 질병과의 차이점
+
+## [차이점 분석]
+(다른 질병들과의 차이점을 설명)
+
+중요한 지시사항:
+- 반드시 위의 형식을 정확히 따라주세요
+- 대제목은 #으로 시작하고 1. 2. 숫자를 붙여주세요
+- 소제목은 ##으로 시작하고 []로 감싸주세요
+- "~~했음", "~~임" 같은 말투는 사용하지 마세요
+- "다음은 개선된 분석입니다" 같은 문장은 사용하지 마세요
+- 간결하고 명확하게 작성해주세요
+"""
+                
+                llm_analysis = self._call_gemini(second_prompt)
+                enhanced_analysis[attr_name] = {
+                    "llm_analysis": llm_analysis
+                }
+                
+            except Exception as e:
+                enhanced_analysis[attr_name] = {
+                    "llm_analysis": f"분석 실패: {str(e)}"
+                }
+        
+        return enhanced_analysis
+    
+    def _format_similarities(self, all_similarities: Dict[str, float]) -> str:
+        """유사도 정보를 포맷팅"""
+        if not all_similarities:
+            return "정보 없음"
+        
+        formatted = []
+        for disease, similarity in sorted(all_similarities.items(), key=lambda x: x[1], reverse=True):
+            formatted.append(f"• {disease}: {similarity:.1%}")
+        
+        return "\n".join(formatted)
+    
     def _build_context_info(self, category: str, attribute_analysis: Dict[str, Any]) -> str:
-        """진단 결과에 대한 컨텍스트 정보 구성"""
+        """진단 결과에 대한 컨텍스트 정보 구성 (기존 메서드 유지)"""
         
         context_parts = [f"진단된 질병 분류: {category}"]
         
@@ -237,6 +439,42 @@ class MedicalDiagnosisAgent:
                     context_parts.append(f"- 다른 질병과의 유사도: {', '.join(other_comparisons)}")
         
         return "\n".join(context_parts)
+    
+    def _generate_summary(self, category: str, attribute_analysis: Dict[str, Any]) -> str:
+        """핵심 진단 요약 생성"""
+        
+        summary_parts = [f"🔍 진단 결과: {category}"]
+        
+        # 각 속성별 분석 결과 요약
+        for attr_name, attr_data in attribute_analysis.items():
+            most_similar = attr_data.get('most_similar_disease', '알 수 없음')
+            similarity = attr_data.get('similarity', 0.0)
+            summary_parts.append(f"• {attr_name}: {most_similar} ({similarity:.1%} 유사)")
+        
+        # 전체 유사도 분석 (상위 3개 질병)
+        if attribute_analysis:
+            all_diseases = {}
+            for attr_data in attribute_analysis.values():
+                all_similarities = attr_data.get('all_similarities', {})
+                for disease, sim in all_similarities.items():
+                    if disease not in all_diseases:
+                        all_diseases[disease] = []
+                    all_diseases[disease].append(sim)
+            
+            # 각 질병의 평균 유사도 계산
+            avg_similarities = {}
+            for disease, similarities in all_diseases.items():
+                avg_similarities[disease] = sum(similarities) / len(similarities)
+            
+            # 상위 3개 질병 정렬
+            top_diseases = sorted(avg_similarities.items(), key=lambda x: x[1], reverse=True)[:3]
+            
+            summary_parts.append("")
+            summary_parts.append("📊 전체 유사도 분석:")
+            for disease, avg_sim in top_diseases:
+                summary_parts.append(f"• {disease}: {avg_sim:.1%}")
+        
+        return "\n".join(summary_parts)
     
     def _get_disease_knowledge(self) -> str:
         """질병 정보를 문자열로 구성"""
