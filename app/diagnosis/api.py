@@ -70,9 +70,12 @@ step3_request_model = diagnosis_ns.model('Step3Request', {
 
 # Define response model for Step3
 step3_data_model = diagnosis_ns.model('Step3Data', {
-    'category': fields.String(required=True, description='진단 카테고리', example="알레르기성 결막염"),
-    'description': fields.String(required=True, description='LLM이 생성한 진단 결과', 
-                                example="환자의 증상과 관찰된 징후를 종합적으로 분석한 결과, 알레르기성 결막염으로 진단됩니다. 안구 표면의 점상 출혈과 결막 부종, 그리고 눈물 분비량 감소가 주요 소견으로 확인되었습니다. 적절한 항염 치료와 함께 알레르기 원인 회피가 권장됩니다.")
+    'category': fields.String(required=True, description='진단 카테고리', example="결막염"),
+    'summary': fields.String(required=True, description='핵심 진단 요약', 
+                            example="🔍 진단 결과: 결막염\n• 분비물 특성: 결막염 (85.2% 유사)\n• 진행 속도: 결막염 (78.9% 유사)\n• 주요 증상: 결막염 (92.1% 유사)\n• 발생 패턴: 결막염 (88.7% 유사)\n\n📊 전체 유사도 분석:\n• 결막염: 86.2%\n• 비궤양성 각막염: 45.3%\n• 안검염: 32.1%"),
+    'details': fields.String(required=True, description='상세 의료 보고서', 
+                            example="환자의 증상과 관찰된 징후를 종합적으로 분석한 결과, 알레르기성 결막염으로 진단됩니다. 안구 표면의 점상 출혈과 결막 부종, 그리고 눈물 분비량 감소가 주요 소견으로 확인되었습니다. 적절한 항염 치료와 함께 알레르기 원인 회피가 권장됩니다."),
+    'attribute_analysis': fields.Raw(required=True, description='속성별 상세 분석 결과')
 })
 
 step3_response_model = diagnosis_ns.model('Step3Response', {
@@ -91,17 +94,13 @@ error_response_model = diagnosis_ns.model('ErrorResponse', {
 # Initialize service
 try:
     diagnosis_service = DiagnosisService()
-    print("✅ DiagnosisService 초기화 성공!")
     
     # 모델 정보 출력
     model_info = diagnosis_service.get_model_info()
-    print(f"🤖 AI Model Information:")
     if model_info.get('step1_model'):
         step1_info = model_info['step1_model']
-        print(f"   Step1: {step1_info['model_architecture']} ({'✅ Loaded' if step1_info['model_loaded'] else '❌ Failed'})")
     if model_info.get('step2_model'):
         step2_info = model_info['step2_model']
-        print(f"   Step2: {step2_info['model_architecture']} ({'✅ Loaded' if step2_info['model_loaded'] else '❌ Failed'})")
         
 except Exception as e:
     # AI 모델 로드 실패 시 서비스 객체를 None으로 설정
@@ -111,7 +110,6 @@ except Exception as e:
     logger = logging.getLogger(__name__)
     logger.error(f"DiagnosisService 초기화 실패: {str(e)}")
     logger.error(f"상세 에러: {traceback.format_exc()}")
-    print(f"❌ DiagnosisService 초기화 실패: {str(e)}")
 
 @diagnosis_ns.route('/info/')
 class DiagnosisInfoResource(Resource):
