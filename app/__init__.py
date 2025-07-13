@@ -1,5 +1,9 @@
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 from app.config import config_by_name as config
+
+# SQLAlchemy 객체 생성 (전역 변수)
+db = SQLAlchemy()
 
 def create_app(config_name='development'):
     """Application factory function to create and configure the Flask app"""
@@ -7,6 +11,12 @@ def create_app(config_name='development'):
     
     # Load configuration
     app.config.from_object(config[config_name])
+    
+    # Initialize SQLAlchemy with app
+    db.init_app(app)
+    
+    # Import models to register them with SQLAlchemy
+    from app.models import chunk
     
     # Register CLI commands
     from app.commands import register_commands

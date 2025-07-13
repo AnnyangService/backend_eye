@@ -12,8 +12,11 @@ services:
       - "PYTHONPATH=/app"
       - "FLASK_APP=run.py"
       - "ENABLE_QUANTIZATION=true"
+      - "DATABASE_URL=postgresql://postgres:password@postgres:5432/eye_diagnosis"
     volumes:
       - .:/app
+    depends_on:
+      - postgres
     extra_hosts:
       - "host.docker.internal:host-gateway"
     deploy:
@@ -22,3 +25,23 @@ services:
           memory: 1.8G # t3.small의 90% 사용
         reservations:
           memory: 512M
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    environment:
+      - POSTGRES_DB=eye_diagnosis
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+volumes:
+  postgres_data:
