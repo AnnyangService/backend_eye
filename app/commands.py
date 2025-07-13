@@ -1,27 +1,73 @@
 """CLI commands for the Flask application"""
 import click
-from flask.cli import with_appcontext
-from app import db
 from flask import current_app
-
-@click.command('init-db')
-@with_appcontext
-def init_db_command():
-    """Clear the existing data and create new tables."""
-    click.echo('Error: Database operations are now handled by the API server.')
-    return
+from flask.cli import with_appcontext
+from sqlalchemy import text
+from app import db
 
 def register_commands(app):
     """Register CLI commands with the app"""
-    app.cli.add_command(init_db_command)
-
-    @app.cli.command('db-info')
+    
+    @app.cli.command('init-db')
     @with_appcontext
-    def db_info():
-        """Show database connection information"""
-        click.echo('Database information:')
-        click.echo(f"Host: {current_app.config.get('MYSQL_HOST')}")
-        click.echo(f"Port: {current_app.config.get('MYSQL_PORT')}")
-        click.echo(f"Database: {current_app.config.get('MYSQL_DB')}")
-        click.echo(f"Environment: {current_app.config.get('ENV', 'development')}")
-        click.echo('Note: Database schema and migrations are now managed by the API server') 
+    def init_db():
+        """데이터베이스 테이블을 생성합니다."""
+        try:
+            # pgvector 확장 활성화
+            db.session.execute(text('CREATE EXTENSION IF NOT EXISTS vector;'))
+            db.session.commit()
+            
+            # documents 테이블을 vector 타입으로 생성
+            create_documents_table_sql = """
+            CREATE TABLE IF NOT EXISTS documents (
+                id SERIAL PRIMARY KEY,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                keywords JSONB,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            """
+            db.session.execute(text(create_documents_table_sql))
+            db.session.commit()
+            
+            click.echo('데이터베이스 테이블이 성공적으로 생성되었습니다.')
+        except Exception as e:
+            click.echo(f'데이터베이스 초기화 중 오류가 발생했습니다: {e}')
+    
+    @app.cli.command('drop-db')
+    @with_appcontext
+    def drop_db():
+        """데이터베이스 테이블을 삭제합니다."""
+        try:
+            db.drop_all()
+            click.echo('데이터베이스 테이블이 성공적으로 삭제되었습니다.')
+        except Exception as e:
+            click.echo(f'데이터베이스 삭제 중 오류가 발생했습니다: {e}')
+    
+    @app.cli.command('reset-db')
+    @with_appcontext
+    def reset_db():
+        """데이터베이스를 초기화합니다 (삭제 후 재생성)."""
+        try:
+            db.drop_all()
+            
+            # pgvector 확장 활성화
+            db.session.execute(text('CREATE EXTENSION IF NOT EXISTS vector;'))
+            db.session.commit()
+            
+            # documents 테이블을 vector 타입으로 생성
+            create_documents_table_sql = """
+            CREATE TABLE IF NOT EXISTS documents (
+                id SERIAL PRIMARY KEY,
+                content TEXT NOT NULL,
+                embedding vector(384),
+                keywords JSONB,
+                created_at TIMESTAMP DEFAULT NOW()
+            );
+            """
+            db.session.execute(text(create_documents_table_sql))
+            db.session.commit()
+            
+            click.echo('데이터베이스가 성공적으로 초기화되었습니다.')
+        except Exception as e:
+            click.echo(f'데이터베이스 초기화 중 오류가 발생했습니다: {e}') 

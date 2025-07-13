@@ -15,9 +15,12 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key'
     DEBUG = False
     
-    # 데이터베이스 설정
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
+    # SQLAlchemy 공통 설정
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+    }
     
     # AI 모델 설정
     STEP1_MODEL_PATH = os.environ.get('STEP1_MODEL_PATH') or 'app/diagnosis/models/step1'
@@ -37,7 +40,9 @@ class Config:
 class DevelopmentConfig(Config):
     """개발 환경 설정"""
     DEBUG = True
-    SQLALCHEMY_ECHO = True  # SQL 쿼리 로깅
+    
+    # 데이터베이스 설정 (개발환경)
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres:password@postgres:5432/eye_diagnosis'
     
     # API 서버 설정 (Step2 결과 콜백용)
     # .env 파일에서 가져오되, 없으면 개발환경 기본값 사용
@@ -47,7 +52,9 @@ class DevelopmentConfig(Config):
 class ProductionConfig(Config):
     """프로덕션 환경 설정"""
     DEBUG = False
-    SQLALCHEMY_ECHO = False
+    
+    # 데이터베이스 설정 (프로덕션)
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')  # 반드시 환경변수로 설정
     
     # API 서버 설정 (프로덕션에서는 반드시 .env에서 설정해야 함)
     API_SERVER_URL = os.environ.get('API_SERVER_URL')  # 기본값 없음 - 반드시 설정 필요
