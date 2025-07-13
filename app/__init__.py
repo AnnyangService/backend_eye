@@ -1,9 +1,5 @@
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 from app.config import config_by_name as config
-
-# Initialize SQLAlchemy instance
-db = SQLAlchemy()
 
 def create_app(config_name='development'):
     """Application factory function to create and configure the Flask app"""
@@ -11,15 +7,6 @@ def create_app(config_name='development'):
     
     # Load configuration
     app.config.from_object(config[config_name])
-    
-    # Initialize extensions with app
-    db.init_app(app)
-    
-    # Import models to ensure they are registered with SQLAlchemy
-    from app.diagnosis.models import (
-        DiagnosisLevel1, DiagnosisLevel2, DiagnosisLevel3, 
-        DiagnosisTarget, DiagnosisRule, DiagnosisRuleDescription
-    )
     
     # Register CLI commands
     from app.commands import register_commands

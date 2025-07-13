@@ -49,9 +49,7 @@ environment:
 #### 개발 환경 (Development)
 
 ```bash
-# 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
-
-# 2. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
+# 1. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
 
 # 3. 개발 환경 설정 (docker-compose.yml 파일에 이미 설정되어 있음)
 # FLASK_ENV=development
@@ -69,9 +67,7 @@ docker-compose logs -f
 #### 배포 환경 (Production)
 
 ```bash
-# 1. Spring 앱의 MySQL 데이터베이스가 먼저 실행되어야 합니다
-
-# 2. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
+# 1. AI 모델 파일이 app/diagnosis/models/step1/ 경로에 있는지 확인
 
 # 3. 배포 환경으로 설정 변경
 # docker-compose.yml 파일의 environment 섹션에서 수정:
@@ -170,14 +166,6 @@ services:
    sudo systemctl enable flask-app
    ```
 
-### 5. 데이터베이스 정보 확인
-
-데이터베이스 연결 정보 확인:
-
-```bash
-flask db-info
-```
-
 ## AI 모델 정보
 
 ### Step1 질병여부판단 모델
@@ -252,14 +240,6 @@ AI 모델 로드에 실패한 경우:
 
 ### 주요 설정
 
-- **데이터베이스 연결**
-
-  - Spring 앱에서 관리하는 MySQL 데이터베이스에 연결
-  - 포트: 3306
-  - 데이터베이스: hi_meow
-  - 사용자: admin
-  - 비밀번호: 1234
-
 - **Flask 앱**
   - 포트: 5000
   - 개발 모드: 활성화
@@ -285,25 +265,6 @@ docker-compose exec flask-app bash
 # 5. AI 모델 상태 확인
 docker-compose logs flask-app | grep -i "model"
 ```
-
-## 데이터베이스 마이그레이션
-
-### 환경별 데이터베이스 관리
-
-- **개발 환경 (Development)**
-
-  - API 서버(Spring)가 데이터베이스 스키마 관리
-  - 개발 환경에서는 Spring 앱이 실행하는 MySQL에 접속
-
-- **배포 환경 (Production)**
-  - API 서버(Spring)가 데이터베이스 스키마 관리
-  - 배포 환경에서는 배포된 데이터베이스에 접속
-
-### 주의사항
-
-- 데이터베이스 스키마와 마이그레이션은 Spring API 서버에서 전적으로 관리
-- Flask 서버는 데이터베이스 읽기/쓰기만 수행하고 스키마 변경은 하지 않음
-- 스키마 변경이 필요한 경우 API 서버 관리자에게 요청
 
 ## API 응답 형식
 
@@ -386,7 +347,5 @@ AI 모델 서비스 불가 시 (503):
 
 - 코드 변경은 실시간으로 반영됨
 - 환경변수는 `docker-compose.yml`에서 관리
-- 데이터베이스 스키마와 마이그레이션은 API 서버(Spring)에서 관리함
-- 개발 환경에서는 Spring 앱이 실행하는 MySQL에 접속하고, 배포 환경에서는 배포된 데이터베이스에 접속
 - AI 모델 파일은 Git에 포함되지 않으므로 별도로 배치 필요
 - GPU 사용 시 CUDA 드라이버와 Docker GPU 지원 설정 필요

@@ -3,7 +3,7 @@ version: "3.8"
 services:
   flask-app:
     platform: linux/amd64
-    build: 
+    build:
       context: .
       target: development # Use the development stage for building
     ports:
@@ -11,11 +11,6 @@ services:
     environment:
       - "PYTHONPATH=/app"
       - "FLASK_APP=run.py"
-      - "MYSQL_HOST=host.docker.internal"
-      - "MYSQL_PORT=3306"
-      - "MYSQL_USER=admin"
-      - "MYSQL_PASSWORD=1234"
-      - "MYSQL_DB=hi_meow"
       - "ENABLE_QUANTIZATION=true"
     volumes:
       - .:/app
@@ -24,6 +19,6 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1.8G  # t3.small의 90% 사용
+          memory: 1.8G # t3.small의 90% 사용
         reservations:
           memory: 512M
