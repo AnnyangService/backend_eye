@@ -12,7 +12,7 @@ services:
       - "PYTHONPATH=/app"
       - "FLASK_APP=run.py"
       - "ENABLE_QUANTIZATION=true"
-      - "DATABASE_URL=postgresql://postgres:password@postgres:5432/eye_diagnosis"
+      - "DATABASE_URL=postgresql://postgres:password@postgres:5432/himeow"
     volumes:
       - .:/app
     depends_on:
@@ -29,7 +29,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg15
     environment:
-      - POSTGRES_DB=eye_diagnosis
+      - POSTGRES_DB=himeow
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=password
     ports:

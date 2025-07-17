@@ -30,3 +30,4 @@ transformers>=4.21.0
 tokenizers>=0.13.0
 google-genai
 gunicorn==21.2.0
+scikit-learn>=1.0.0

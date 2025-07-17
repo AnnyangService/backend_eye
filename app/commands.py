@@ -31,6 +31,7 @@ def register_commands(app):
                 content TEXT NOT NULL,
                 embedding vector(768),
                 keywords JSONB,
+                source VARCHAR(255),
                 created_at TIMESTAMP DEFAULT NOW()
             );
             """
@@ -62,13 +63,14 @@ def register_commands(app):
             db.session.execute(text('CREATE EXTENSION IF NOT EXISTS vector;'))
             db.session.commit()
             
-            # documents 테이블을 vector 타입으로 생성
+            # documents 테이블을 vector 타입으로 생성 (source 컬럼 추가)
             create_documents_table_sql = """
             CREATE TABLE IF NOT EXISTS documents (
                 id SERIAL PRIMARY KEY,
                 content TEXT NOT NULL,
                 embedding vector(768),
                 keywords JSONB,
+                source VARCHAR(255),
                 created_at TIMESTAMP DEFAULT NOW()
             );
             """
@@ -120,15 +122,16 @@ def register_commands(app):
                     # PostgreSQL vector 형식으로 변환
                     embedding_str = f"[{','.join(map(str, embedding))}]"
                     
-                    # 데이터베이스에 저장
+                    # 데이터베이스에 저장 (source에 chunk_id 저장)
                     insert_sql = """
-                    INSERT INTO documents (content, embedding, keywords)
-                    VALUES (:content, :embedding, :keywords)
+                    INSERT INTO documents (content, embedding, keywords, source)
+                    VALUES (:content, :embedding, :keywords, :source)
                     """
                     db.session.execute(text(insert_sql), {
                         'content': content,
                         'embedding': embedding_str,
-                        'keywords': json.dumps(keywords)
+                        'keywords': json.dumps(keywords),
+                        'source': chunk_id
                     })
                     
                     saved_count += 1
@@ -153,22 +156,22 @@ def register_commands(app):
             count = count_result.fetchone()[0]
             logger.info(f'총 문서 개수: {count}개')
             
-            # 샘플 데이터 확인
+            # 샘플 데이터 확인 (source, keywords, content_preview, created_at 포함)
             sample_result = db.session.execute(text('''
                 SELECT id, 
+                       source,
                        LEFT(content, 50) as content_preview, 
                        keywords,
                        created_at 
                 FROM documents 
-                LIMIT 3;
+                LIMIT 5;
             '''))
             
             samples = sample_result.fetchall()
             logger.info('샘플 데이터:')
             for sample in samples:
-                logger.info(f'  ID: {sample[0]}, 내용: {sample[1]}..., 키워드: {sample[2]}')
+                logger.info(f'  ID: {sample[0]}, source: {sample[1]}, 내용: {sample[2]}..., 키워드: {sample[3]}, 생성일: {sample[4]}')
             
-            # 임베딩 차원 확인 (pgvector는 차원을 직접 확인할 수 없으므로 건너뜀)
             if count > 0:
                 logger.info('임베딩이 포함된 데이터가 저장되어 있습니다.')
             else:
