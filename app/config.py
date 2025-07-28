@@ -21,6 +21,8 @@ class Config:
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
+    # SQLAlchemy 로깅 비활성화
+    SQLALCHEMY_ECHO = False
     
     # AI 모델 설정
     STEP1_MODEL_PATH = os.environ.get('STEP1_MODEL_PATH') or 'app/diagnosis/models/step1'
@@ -42,7 +44,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     
     # 데이터베이스 설정 (개발환경)
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres:password@postgres:5432/eye_diagnosis'
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'postgresql://postgres:password@postgres:5432/himeow'
     
     # API 서버 설정 (Step2 결과 콜백용)
     # .env 파일에서 가져오되, 없으면 개발환경 기본값 사용
