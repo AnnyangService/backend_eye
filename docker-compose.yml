@@ -45,3 +45,8 @@ services:
 
 volumes:
   postgres_data:
+  model_cache: # 모델 캐시 볼륨 추가
+
+networks:
+  app-network:
+    driver: bridge

@@ -140,6 +140,7 @@ class RAGRetrievalService:
                 ORDER BY embedding <=> '{embedding_str}'::vector
                 LIMIT :top_k;
             """
+            
             result = session.execute(text(sql), {'top_k': top_k})
             
             results = []
@@ -155,7 +156,7 @@ class RAGRetrievalService:
                     'chunk_id': str(row[0])
                 })
             
-            logger.info(f"질문 '{query}'에 대한 벡터 검색 완료: {len(results)}개 결과")
+            logger.info(f"질문 '{query[:30]}...'에 대한 벡터 검색 완료: {len(results)}개 결과")
             
             return results
             

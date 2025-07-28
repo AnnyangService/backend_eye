@@ -21,6 +21,8 @@ class Config:
         'pool_pre_ping': True,
         'pool_recycle': 300,
     }
+    # SQLAlchemy 로깅 비활성화
+    SQLALCHEMY_ECHO = False
     
     # AI 모델 설정
     STEP1_MODEL_PATH = os.environ.get('STEP1_MODEL_PATH') or 'app/diagnosis/models/step1'
