@@ -14,7 +14,7 @@ services:
       - "ENABLE_QUANTIZATION=true"
       - "DATABASE_URL=postgresql://postgres:password@postgres:5432/himeow"
     volumes:
-      - .:/app
+      - .:/app/app
     depends_on:
       - postgres
     extra_hosts:

@@ -108,13 +108,14 @@ class RAGRetrievalService:
             logger.error(f"질문 임베딩 생성 실패: {str(e)}")
             raise Exception(f"질문 임베딩 생성 실패: {str(e)}")
     
-    def search_similar_chunks(self, query: str, top_k: int = 5) -> List[Dict[str, Any]]:
+    def search_similar_chunks(self, query: str, top_k: int = 5, diagnosis_filter: str = None) -> List[Dict[str, Any]]:
         """
         사용자 질문과 유사한 청크들을 PostgreSQL 벡터 검색으로 찾습니다.
         
         Args:
             query (str): 사용자 질문
             top_k (int): 반환할 최대 청크 수
+            diagnosis_filter (str): 진단 결과에 따른 필터링 (예: "각막궤양", "결막염")
             
         Returns:
             List[Dict[str, Any]]: 유사한 청크들과 유사도 점수
@@ -127,6 +128,21 @@ class RAGRetrievalService:
             embedding_str = "[" + ",".join(str(x) for x in query_embedding.tolist()) + "]"
             session = self._get_db_session()
             
+            # 진단 결과 필터링 조건 추가
+            if diagnosis_filter:
+                # 진단 결과에서 공백 제거하여 더 유연한 매칭
+                clean_filter = diagnosis_filter.replace(' ', '')
+                # 진단 결과가 "비궤양성 각막염"이면 "비궤양성각막염."으로 시작하는 source만 검색
+                # ILIKE 사용으로 대소문자 무시, 더 유연한 매칭
+                filter_condition = f"AND source ILIKE '{clean_filter}.%'"
+                logger.info(f"진단 결과 '{diagnosis_filter}' 기반 필터링 적용 (공백 제거: '{clean_filter}')")
+                
+                # 추가 검증: 검색 결과가 해당 질병과 관련된 것인지 확인
+                logger.info(f"'{clean_filter}' 관련 문서만 검색하도록 제한")
+            else:
+                filter_condition = ""
+                logger.warning("진단 결과 필터링 없음 - 안전하지 않음")
+            
             # embedding 파라미터를 쿼리문에 직접 문자열로 삽입
             sql = f"""
                 SELECT 
@@ -137,6 +153,7 @@ class RAGRetrievalService:
                     1 - (embedding <=> '{embedding_str}'::vector) as similarity
                 FROM documents 
                 WHERE embedding IS NOT NULL
+                {filter_condition}
                 ORDER BY embedding <=> '{embedding_str}'::vector
                 LIMIT :top_k;
             """

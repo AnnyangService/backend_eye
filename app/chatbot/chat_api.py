@@ -19,6 +19,7 @@ initial_chat_request_model = chat_ns.model('InitialChatRequest', {
 # Define request model for RAG chat
 rag_chat_request_model = chat_ns.model('RAGChatRequest', {
     'query': fields.String(required=True, description='사용자 질문', example="이 질병은 어떻게 치료하나요?"),
+    'diagnosis_result': fields.String(required=True, description='진단 결과', example="비궤양성 각막염"),
     'previous_question': fields.String(description='가장 최근 이전 질문', example="이 질병은 무엇인가요?"),
     'previous_answer': fields.String(description='가장 최근 이전 답변', example="비궤양성 각막염은 각막의 염증성 질환입니다."),
     'two_turn_question': fields.String(description='전전 질문', example="증상이 심각한가요?"),
@@ -190,13 +191,15 @@ class RAGChatResource(Resource):
                 }, 400
             
             # 필수 필드 검증
-            if not data.get('query'):
-                return {
-                    'success': False,
-                    'error_code': 'VALIDATION_ERROR',
-                    'message': 'query is required',
-                    'details': {'query': 'This field is required'}
-                }, 400
+            required_fields = ['query', 'diagnosis_result']
+            for field in required_fields:
+                if not data.get(field):
+                    return {
+                        'success': False,
+                        'error_code': 'VALIDATION_ERROR',
+                        'message': f'{field} is required',
+                        'details': {field: f'{field} is required'}
+                    }, 400
             
             # RAG 채팅 처리
             result = rag_chat_service.generate_response(data)
