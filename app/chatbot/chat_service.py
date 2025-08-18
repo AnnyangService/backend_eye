@@ -215,14 +215,24 @@ class RAGChatService:
             logger.error(f"제미나이 API 호출 중 오류: {str(e)}")
             return f"AI 응답 생성 중 오류가 발생했습니다: {str(e)}"
     
-    def _search_relevant_documents(self, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """RAG 검색을 통해 관련 문서 검색"""
+    def _search_relevant_documents(self, query: str, diagnosis_result: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """RAG 검색을 통해 관련 문서 검색 (진단 결과 기반 필터링)"""
         if not self.rag_available or not self.rag_service:
             logger.warning("RAG 검색 서비스를 사용할 수 없습니다.")
             return []
         
         try:
-            results = self.rag_service.search_similar_chunks(query, top_k)
+            # 진단 결과가 있으면 해당 질병 관련 문서만 검색
+            if diagnosis_result:
+                logger.info(f"진단 결과 '{diagnosis_result}' 기반으로 문서 검색")
+                results = self.rag_service.search_similar_chunks(
+                    query, 
+                    top_k, 
+                    diagnosis_filter=diagnosis_result
+                )
+            else:
+                logger.info("진단 결과 없이 전체 문서에서 검색")
+                results = self.rag_service.search_similar_chunks(query, top_k)
             
             # 검색된 문서 내용만 로그 출력
             for i, doc in enumerate(results, 1):
@@ -288,6 +298,7 @@ class RAGChatService:
             request_data (dict): 요청 데이터
                 {
                     "query": str,                    # 현재 질문
+                    "diagnosis_result": str,          # 진단 결과 (예: "비궤양성 각막염")
                     "previous_question": str,         # 이전 질문
                     "previous_answer": str,           # 이전 답변
                     "two_turn_question": str,         # 전전 질문
@@ -311,10 +322,20 @@ class RAGChatService:
                     "error": "질문이 비어있습니다."
                 }
             
-            logger.info(f"RAG 챗봇 요청 처리 시작: {query[:50]}...")
+            # 진단 결과 확인
+            diagnosis_result = request_data.get('diagnosis_result', '').strip()
             
-            # 1. RAG 검색으로 관련 문서 찾기
-            retrieved_documents = self._search_relevant_documents(query)
+            if not diagnosis_result:
+                return {
+                    "answer": "진단 결과를 확인할 수 없습니다. 진단 정보를 다시 확인해주세요.",
+                    "retrieved_documents": [],
+                    "error": "진단 결과가 비어있습니다."
+                }
+            
+            logger.info(f"RAG 챗봇 요청 처리 시작: {query[:50]}... (진단: {diagnosis_result})")
+            
+            # 1. RAG 검색으로 관련 문서 찾기 (진단 결과 기반)
+            retrieved_documents = self._search_relevant_documents(query, diagnosis_result)
             
             # 2. 대화 기록 포맷팅
             conversation_history = self._format_conversation_history(request_data)
@@ -322,8 +343,8 @@ class RAGChatService:
             # 3. 검색된 문서 포맷팅
             formatted_documents = self._format_retrieved_documents(retrieved_documents)
             
-            # 4. 프롬프트 생성
-            prompt = self._build_prompt(query, conversation_history, formatted_documents)
+            # 4. 프롬프트 생성 (진단 결과 포함)
+            prompt = self._build_prompt(query, conversation_history, formatted_documents, diagnosis_result)
             
             # 생성된 프롬프트 로그 출력 (전체)
             logger.info("=" * 50)
@@ -351,13 +372,16 @@ class RAGChatService:
                 "error": str(e)
             }
     
-    def _build_prompt(self, query: str, conversation_history: str, formatted_documents: str) -> str:
+    def _build_prompt(self, query: str, conversation_history: str, formatted_documents: str, diagnosis_result: str) -> str:
         """프롬프트 생성 (RAG 검색 기반)"""
+        
+        # 진단 결과 정보 추가
+        diagnosis_info = f"\n[현재 진단 결과]\n{diagnosis_result}\n"
         
         prompt = f"""[기본 프롬프트 - 시스템 역할 및 지침]
 당신은 전문 수의사 어시스턴트입니다. 사용자의 질문에 정확하고 책임감 있게 답변하십시오.
 제공하는 정보는 참고용이며, 최종 진단 및 치료는 반드시 수의사와의 상담을 통해 이루어져야 합니다.
-아래의 이전 대화 기록과 검색된 문서를 참고하여 사용자의 질문에 답변하세요.
+아래의 이전 대화 기록과 검색된 문서를 참고하여 사용자의 질문에 답변하세요.{diagnosis_info}
 
 [이전 대화 기록 - 최근 2턴]
 {conversation_history}
@@ -373,7 +397,7 @@ class RAGChatService:
 1. 정확하고 유용한 정보를 제공하되, 최종 진단은 수의사에게 맡겨야 한다는 점을 명시하세요.
 2. 이전 대화 맥락을 고려하여 일관성 있는 답변을 제공하세요.
 3. 검색된 문서의 정보를 적절히 활용하세요. 출처는 명시하지 않아도 됩니다.
-4. 검색된 문서의 source가 사용자의 진단된 질병과 거리가 먼 경우 참고하지 마세요.
+4. 진단된 질병 '{diagnosis_result}'과 관련된 정보를 우선적으로 참고하세요.
 5. 보호자가 이해하기 쉽고 실용적인 조언을 제공하세요.
 6. 긴급한 상황이나 심각한 증상의 경우 즉시 수의사 진료를 권고하세요.
 7. 가능하다면 사용자의 질문에 유용한 답변을 제공해야 합니다."""
