@@ -45,7 +45,6 @@ RUN chown -R appuser:appuser /app
 EXPOSE 5000
 
 # Set common environment variables
-ENV PYTHONPATH=/app
 ENV FLASK_APP=run.py
 
 # development stage
