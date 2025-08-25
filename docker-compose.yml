@@ -2,7 +2,6 @@ version: "3.8"
 
 services:
   flask-app:
-    platform: linux/amd64
     build:
       context: .
       target: development # Use the development stage for building
