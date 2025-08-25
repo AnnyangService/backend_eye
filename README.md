@@ -201,8 +201,8 @@ AI 모델 로드에 실패한 경우:
 
 애플리케이션 실행 후 다음 URL에서 Swagger UI에 접속할 수 있습니다:
 
-- **개발 환경**: http://localhost:5000/api/docs/
-- **배포 환경**: http://your-domain.com/api/docs/
+- **개발 환경**: http://localhost:5000/docs/
+- **배포 환경**: http://your-domain.com/docs/
 
 ### 주요 기능
 
