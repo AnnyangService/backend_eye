@@ -75,7 +75,21 @@ step3_data_model = diagnosis_ns.model('Step3Data', {
                             example="🔍 진단 결과: 결막염\n• 분비물 특성: 결막염 (85.2% 유사)\n• 진행 속도: 결막염 (78.9% 유사)\n• 주요 증상: 결막염 (92.1% 유사)\n• 발생 패턴: 결막염 (88.7% 유사)\n\n📊 전체 유사도 분석:\n• 결막염: 86.2%\n• 비궤양성 각막염: 45.3%\n• 안검염: 32.1%"),
     'details': fields.String(required=True, description='상세 의료 보고서', 
                             example="환자의 증상과 관찰된 징후를 종합적으로 분석한 결과, 알레르기성 결막염으로 진단됩니다. 안구 표면의 점상 출혈과 결막 부종, 그리고 눈물 분비량 감소가 주요 소견으로 확인되었습니다. 적절한 항염 치료와 함께 알레르기 원인 회피가 권장됩니다."),
-    'attribute_analysis': fields.Raw(required=True, description='속성별 상세 분석 결과')
+    'attribute_analysis': fields.Raw(required=True, description='속성별 상세 분석 결과', 
+                                example={
+                                    "분비물 특성": {
+                                        "llm_analysis": "# 1. 비궤양성 각막염와 유사성\n\n제공된 정보에 따르면 비궤양성 각막염과 85.7% 일치합니다."
+                                    },
+                                    "진행 속도": {
+                                        "llm_analysis": "# 1. 비궤양성 각막염와 유사성\n\n제공된 정보에 따르면 비궤양성 각막염과 84.5% 일치합니다."
+                                    },
+                                    "주요 증상": {
+                                        "llm_analysis": "# 1. 비궤양성 각막염와 유사성\n\n제공된 정보에 따르면 비궤양성 각막염과 90.6% 일치합니다."
+                                    },
+                                    "발생 패턴": {
+                                        "llm_analysis": "# 1. 결막염과의 유사성\n\n제공된 정보에 따르면 결막염과 82.7% 일치합니다."
+                                    }
+                                })
 })
 
 step3_response_model = diagnosis_ns.model('Step3Response', {
@@ -282,6 +296,7 @@ class DiagnosisStep2Resource(Resource):
 class DiagnosisStep3Resource(Resource):
     @diagnosis_ns.doc('질병분석 Step3')
     @diagnosis_ns.expect(step3_request_model, validate=True)
+    @diagnosis_ns.response(200, 'Success', step3_response_model)
     def post(self):
         """
         질병분석 Step3 - 세부 진단
