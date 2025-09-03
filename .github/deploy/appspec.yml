@@ -1,7 +1,7 @@
 version: 0.0
 os: linux
 files:
-  - source: my-app-image.tar.gz
+  - source: /
     destination: /app
 hooks:
   BeforeInstall:
