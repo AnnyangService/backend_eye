@@ -18,6 +18,8 @@ def register_namespaces():
     """Register all API namespaces"""
     from app.diagnosis.api import diagnosis_ns
     from app.chatbot.chat_api import chat_ns
+    from app.general_chatbot.api import general_chat_ns
     
     api.add_namespace(diagnosis_ns, path='/diagnosis')
-    api.add_namespace(chat_ns, path='/chat') 
+    api.add_namespace(chat_ns, path='/chat')
+    api.add_namespace(general_chat_ns, path='/chat') 
